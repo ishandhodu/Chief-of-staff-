@@ -6,6 +6,7 @@ import { saveApproval } from './approval-store';
 export async function runAgentLoop(
   prompt: string,
   tools: Tool[],
+  // digestChannelId is passed through to callers for posting results; not used by the loop itself
   digestChannelId: string,
   maxIterations = 10
 ): Promise<AgentResult> {
@@ -33,8 +34,8 @@ export async function runAgentLoop(
     messages.push({ role: 'assistant', content: response.content });
 
     if (response.stop_reason === 'end_turn') {
-      const textBlock = response.content.find((b) => b.type === 'text');
-      const summary = textBlock?.type === 'text' ? textBlock.text : '';
+      const textBlock = response.content.find((b) => b.type === 'text') as Anthropic.TextBlock | undefined;
+      const summary = textBlock ? textBlock.text : '';
       return { summary, pendingApprovals };
     }
 
