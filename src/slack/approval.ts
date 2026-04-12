@@ -5,7 +5,9 @@ export async function postApprovalMessage(
   approval: ApprovalRequest,
   channelId: string
 ): Promise<void> {
-  const client = new WebClient(process.env.SLACK_BOT_TOKEN);
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) throw new Error('SLACK_BOT_TOKEN environment variable is not set');
+  const client = new WebClient(token);
 
   await client.chat.postMessage({
     channel: channelId,
