@@ -24,17 +24,16 @@ Then synthesize a structured morning briefing with these sections:
 **✅ Open Tasks**
 - List overdue or due-today Notion tasks
 
-**⏳ Pending Approvals**
-- List any actions currently awaiting your approval
-
 Keep it tight. The CEO reads this in 2 minutes.
 `.trim();
 
 export const dailyDigestWorkflow: Workflow = {
   name: 'daily-digest',
   async run(ctx: WorkflowContext) {
-    const channelId = process.env.DIGEST_CHANNEL_ID!;
+    const channelId = process.env.DIGEST_CHANNEL_ID;
+    if (!channelId) throw new Error('DIGEST_CHANNEL_ID environment variable is not set');
     const result = await runAgentLoop(DIGEST_PROMPT, ALL_TOOLS, channelId);
     await ctx.postToSlack(result.summary);
+    // pendingApprovals not surfaced in digest: approval buttons are sent by inbox-triage at triage time
   },
 };

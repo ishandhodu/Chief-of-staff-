@@ -12,7 +12,8 @@ export const threadToTaskWorkflow: Workflow = {
       return;
     }
 
-    const channelId = process.env.DIGEST_CHANNEL_ID!;
+    const channelId = process.env.DIGEST_CHANNEL_ID;
+    if (!channelId) throw new Error('DIGEST_CHANNEL_ID environment variable is not set');
 
     const prompt = `
 You are an AI Chief of Staff. The CEO wants to create a Notion task from an email thread.
@@ -35,5 +36,6 @@ If no thread is found, report that clearly.
 
     const result = await runAgentLoop(prompt, ALL_TOOLS, channelId);
     await ctx.postToSlack(result.summary);
+    // pendingApprovals not surfaced here: thread-to-task only calls low-risk tools (create_task, search_thread)
   },
 };

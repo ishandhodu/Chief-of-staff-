@@ -21,7 +21,8 @@ Be concise. Do not explain your reasoning for every email — just do it and sum
 export const inboxTriageWorkflow: Workflow = {
   name: 'inbox-triage',
   async run(ctx: WorkflowContext) {
-    const channelId = process.env.DIGEST_CHANNEL_ID!;
+    const channelId = process.env.DIGEST_CHANNEL_ID;
+    if (!channelId) throw new Error('DIGEST_CHANNEL_ID environment variable is not set');
     const result = await runAgentLoop(TRIAGE_PROMPT, ALL_TOOLS, channelId);
 
     await ctx.postToSlack(`*Inbox Triage Complete*\n\n${result.summary}`);

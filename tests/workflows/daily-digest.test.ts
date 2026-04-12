@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/agent/loop', () => ({
   runAgentLoop: vi.fn(),
@@ -7,6 +7,10 @@ vi.mock('@/agent/loop', () => ({
 import { runAgentLoop } from '@/agent/loop';
 import { dailyDigestWorkflow } from '@/workflows/daily-digest';
 import type { WorkflowContext } from '@/types';
+
+beforeEach(() => {
+  process.env.DIGEST_CHANNEL_ID = 'C_TEST_CHANNEL';
+});
 
 describe('dailyDigestWorkflow', () => {
   it('runs the agent and posts the digest to Slack', async () => {

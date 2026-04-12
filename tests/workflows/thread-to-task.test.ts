@@ -10,6 +10,7 @@ import type { WorkflowContext } from '@/types';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.DIGEST_CHANNEL_ID = 'C_TEST_CHANNEL';
 });
 
 describe('threadToTaskWorkflow', () => {
