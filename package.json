@@ -6,7 +6,8 @@
     "dev": "vercel dev",
     "build": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "get-google-token": "npx tsx scripts/get-google-token.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
