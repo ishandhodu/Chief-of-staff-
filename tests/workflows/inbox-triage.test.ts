@@ -4,7 +4,12 @@ vi.mock('@/agent/loop', () => ({
   runAgentLoop: vi.fn(),
 }));
 
+vi.mock('@/slack/approval', () => ({
+  postApprovalMessage: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { runAgentLoop } from '@/agent/loop';
+import { postApprovalMessage } from '@/slack/approval';
 import { inboxTriageWorkflow } from '@/workflows/inbox-triage';
 import type { WorkflowContext } from '@/types';
 
@@ -52,9 +57,14 @@ describe('inboxTriageWorkflow', () => {
 
     await inboxTriageWorkflow.run(ctx);
 
-    // Should post the summary AND a separate approval request message
-    expect(postToSlack).toHaveBeenCalledTimes(2);
-    const approvalCall = vi.mocked(postToSlack).mock.calls[1][0] as string;
-    expect(approvalCall).toContain('approval');
+    // Summary posted via ctx.postToSlack
+    expect(postToSlack).toHaveBeenCalledTimes(1);
+
+    // Approval posted via postApprovalMessage with Block Kit buttons
+    expect(postApprovalMessage).toHaveBeenCalledOnce();
+    expect(postApprovalMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'uuid-1', toolName: 'send_email' }),
+      'C_TEST_CHANNEL'
+    );
   });
 });

@@ -1,6 +1,7 @@
 import type { Workflow, WorkflowContext } from '@/types';
 import { ALL_TOOLS } from '@/agent/tools';
 import { runAgentLoop } from '@/agent/loop';
+import { postApprovalMessage } from '@/slack/approval';
 
 const TRIAGE_PROMPT = `
 You are an AI Chief of Staff. Your task is to triage the CEO's inbox.
@@ -28,9 +29,7 @@ export const inboxTriageWorkflow: Workflow = {
     await ctx.postToSlack(`*Inbox Triage Complete*\n\n${result.summary}`);
 
     for (const approval of result.pendingApprovals) {
-      await ctx.postToSlack(
-        `*Action requires your approval*\n\n${approval.description}\n\nApproval ID: \`${approval.id}\`\n_(Tap Approve or Cancel below)_`
-      );
+      await postApprovalMessage(approval, channelId);
     }
   },
 };
