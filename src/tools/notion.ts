@@ -1,0 +1,118 @@
+import { Client } from '@notionhq/client';
+
+function getNotionClient() {
+  return new Client({ auth: process.env.NOTION_API_KEY });
+}
+
+export interface NotionTask {
+  pageId: string;
+  url: string;
+}
+
+export async function createTask(args: Record<string, unknown>): Promise<NotionTask> {
+  const title = args.title as string | undefined;
+  if (!title || typeof title !== 'string') {
+    throw new Error('createTask requires a non-empty title string');
+  }
+
+  const { deadline, stakeholders, context, sourceId } = args as {
+    deadline?: string;
+    stakeholders?: string;
+    context?: string;
+    sourceId?: string;
+  };
+
+  const notion = getNotionClient();
+  const databaseId = process.env.NOTION_DATABASE_ID;
+  if (!databaseId) throw new Error('NOTION_DATABASE_ID environment variable is not set');
+
+  const properties: Record<string, unknown> = {
+    Name: { title: [{ text: { content: title } }] },
+    Status: { select: { name: 'To Do' } },
+  };
+
+  if (deadline) {
+    properties['Deadline'] = { date: { start: deadline } };
+  }
+  if (stakeholders) {
+    properties['Stakeholders'] = { rich_text: [{ text: { content: stakeholders } }] };
+  }
+  if (context) {
+    properties['Context'] = { rich_text: [{ text: { content: context } }] };
+  }
+  if (sourceId) {
+    properties['Source'] = { rich_text: [{ text: { content: sourceId } }] };
+  }
+
+  const res = await notion.pages.create({
+    parent: { database_id: databaseId },
+    properties: properties as never,
+  });
+
+  const page = res as { id: string; url: string };
+  if (!page.id) throw new Error('Notion API returned page without id');
+
+  return { pageId: page.id, url: page.url };
+}
+
+export interface PageResult {
+  pageId: string;
+  title: string;
+  url: string;
+}
+
+export async function searchPages(args: Record<string, unknown>): Promise<PageResult[]> {
+  const query = args.query as string | undefined;
+  if (!query || typeof query !== 'string') {
+    throw new Error('searchPages requires a non-empty query string');
+  }
+
+  const notion = getNotionClient();
+  const databaseId = process.env.NOTION_DATABASE_ID;
+  if (!databaseId) throw new Error('NOTION_DATABASE_ID environment variable is not set');
+
+  const res = await notion.databases.query({
+    database_id: databaseId,
+    filter: {
+      property: 'Name',
+      title: { contains: query },
+    },
+    page_size: 10,
+  });
+
+  return res.results.map((page: unknown) => {
+    const p = page as {
+      id: string;
+      url: string;
+      properties: { Name: { title: Array<{ plain_text: string }> } };
+    };
+    return {
+      pageId: p.id,
+      title: p.properties.Name.title[0]?.plain_text ?? '',
+      url: p.url,
+    };
+  });
+}
+
+export async function updatePage(args: Record<string, unknown>): Promise<{ success: boolean; pageId: string }> {
+  const pageId = args.pageId as string | undefined;
+  const status = args.status as string | undefined;
+
+  if (!pageId || typeof pageId !== 'string') {
+    throw new Error('updatePage requires a non-empty pageId string');
+  }
+  if (!status || typeof status !== 'string') {
+    throw new Error('updatePage requires a non-empty status string');
+  }
+
+  const notion = getNotionClient();
+
+  await notion.pages.update({
+    page_id: pageId,
+    properties: {
+      Status: { select: { name: status } },
+    } as never,
+  });
+
+  return { success: true, pageId };
+}
