@@ -13,6 +13,14 @@ function getHeader(headers: Array<{ name?: string | null; value?: string | null 
   return headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
 }
 
+function extractBody(payload: { body?: { data?: string | null } | null; parts?: Array<{ body?: { data?: string | null } | null }> | null } | null | undefined): string {
+  const direct = payload?.body?.data;
+  if (direct) return Buffer.from(direct, 'base64').toString('utf-8');
+  const part = payload?.parts?.[0]?.body?.data;
+  if (part) return Buffer.from(part, 'base64').toString('utf-8');
+  return '';
+}
+
 export interface EmailSummary {
   id: string;
   threadId: string;
@@ -37,15 +45,19 @@ export async function listEmails(args: Record<string, unknown>): Promise<EmailSu
 
   const summaries = await Promise.all(
     messages.map(async (msg) => {
+      const msgId = msg.id;
+      if (!msgId) throw new Error('Gmail API returned message without id');
       const getRes = await gmail.users.messages.get({
         userId: 'me',
-        id: msg.id!,
+        id: msgId,
         format: 'metadata',
         metadataHeaders: ['From', 'Subject', 'Date'],
       });
+      const id = getRes.data.id;
+      if (!id) throw new Error('Gmail API returned message without id');
       const headers = getRes.data.payload?.headers ?? [];
       return {
-        id: getRes.data.id!,
+        id,
         threadId: getRes.data.threadId ?? '',
         from: getHeader(headers, 'From'),
         subject: getHeader(headers, 'Subject'),
@@ -70,7 +82,10 @@ export interface ThreadDetail {
 }
 
 export async function searchThread(args: Record<string, unknown>): Promise<ThreadDetail | null> {
-  const query = args.query as string;
+  if (typeof args.query !== 'string' || args.query.trim() === '') {
+    throw new Error('searchThread requires a non-empty query string');
+  }
+  const query = args.query;
   const gmail = getGmailClient();
 
   const listRes = await gmail.users.messages.list({
@@ -82,20 +97,23 @@ export async function searchThread(args: Record<string, unknown>): Promise<Threa
   const messages = listRes.data.messages ?? [];
   if (messages.length === 0) return null;
 
+  const firstMsgId = messages[0].id;
+  if (!firstMsgId) throw new Error('Gmail API returned message without id');
+
   const getRes = await gmail.users.messages.get({
     userId: 'me',
-    id: messages[0].id!,
+    id: firstMsgId,
     format: 'full',
   });
 
+  const id = getRes.data.id;
+  if (!id) throw new Error('Gmail API returned message without id');
+
   const headers = getRes.data.payload?.headers ?? [];
-  const bodyData = getRes.data.payload?.body?.data ?? '';
-  const body = bodyData
-    ? Buffer.from(bodyData, 'base64').toString('utf-8')
-    : getRes.data.snippet ?? '';
+  const body = extractBody(getRes.data.payload) || (getRes.data.snippet ?? '');
 
   return {
-    id: getRes.data.id!,
+    id,
     threadId: getRes.data.threadId ?? '',
     subject: getHeader(headers, 'Subject'),
     from: getHeader(headers, 'From'),
@@ -106,6 +124,9 @@ export async function searchThread(args: Record<string, unknown>): Promise<Threa
 }
 
 export async function saveDraft(args: Record<string, unknown>): Promise<{ draftId: string }> {
+  if (typeof args.to !== 'string' || !args.to) throw new Error('saveDraft requires a non-empty "to" string');
+  if (typeof args.subject !== 'string' || !args.subject) throw new Error('saveDraft requires a non-empty "subject" string');
+  if (typeof args.body !== 'string' || !args.body) throw new Error('saveDraft requires a non-empty "body" string');
   const { to, subject, body } = args as { to: string; subject: string; body: string };
   const gmail = getGmailClient();
 
@@ -124,10 +145,15 @@ export async function saveDraft(args: Record<string, unknown>): Promise<{ draftI
     requestBody: { message: { raw: encoded } },
   });
 
-  return { draftId: res.data.id! };
+  const draftId = res.data.id;
+  if (!draftId) throw new Error('Gmail API returned draft without id');
+  return { draftId };
 }
 
 export async function sendEmail(args: Record<string, unknown>): Promise<{ messageId: string }> {
+  if (typeof args.to !== 'string' || !args.to) throw new Error('sendEmail requires a non-empty "to" string');
+  if (typeof args.subject !== 'string' || !args.subject) throw new Error('sendEmail requires a non-empty "subject" string');
+  if (typeof args.body !== 'string' || !args.body) throw new Error('sendEmail requires a non-empty "body" string');
   const { to, subject, body } = args as { to: string; subject: string; body: string };
   const gmail = getGmailClient();
 
@@ -146,10 +172,14 @@ export async function sendEmail(args: Record<string, unknown>): Promise<{ messag
     requestBody: { raw: encoded },
   });
 
-  return { messageId: res.data.id! };
+  const messageId = res.data.id;
+  if (!messageId) throw new Error('Gmail API returned message without id');
+  return { messageId };
 }
 
 export async function labelEmail(args: Record<string, unknown>): Promise<{ success: boolean; messageId: string }> {
+  if (typeof args.messageId !== 'string' || !args.messageId) throw new Error('labelEmail requires a non-empty "messageId" string');
+  if (typeof args.label !== 'string' || !args.label) throw new Error('labelEmail requires a non-empty "label" string');
   const { messageId, label } = args as { messageId: string; label: string };
   const gmail = getGmailClient();
 

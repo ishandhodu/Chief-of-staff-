@@ -32,6 +32,8 @@ import {
   labelEmail,
 } from '@/tools/gmail';
 
+beforeEach(() => vi.clearAllMocks());
+
 describe('listEmails', () => {
   it('returns a list of email summaries', async () => {
     const mockMessages = {
@@ -118,5 +120,10 @@ describe('labelEmail', () => {
 
     const result = await labelEmail({ messageId: 'msg1', label: 'urgent' });
     expect(result).toEqual({ success: true, messageId: 'msg1' });
+    expect(gmail.users.messages.modify).toHaveBeenCalledWith({
+      userId: 'me',
+      id: 'msg1',
+      requestBody: { addLabelIds: ['URGENT'] },
+    });
   });
 });
