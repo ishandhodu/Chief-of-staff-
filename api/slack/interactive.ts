@@ -4,14 +4,29 @@ import { getApproval, deleteApproval } from '@/agent/approval-store';
 import { ALL_TOOLS } from '@/agent/tools';
 import { postMessage } from '@/tools/slack';
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+async function getRawBody(req: VercelRequest): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString()));
+    req.on('error', reject);
+  });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).end();
   }
 
+  const rawBody = await getRawBody(req);
   const signature = req.headers['x-slack-signature'] as string;
   const timestamp = req.headers['x-slack-request-timestamp'] as string;
-  const rawBody = JSON.stringify(req.body);
 
   if (!verifySlackSignature(process.env.SLACK_SIGNING_SECRET!, signature, timestamp, rawBody)) {
     return res.status(401).json({ error: 'Invalid signature' });
@@ -20,7 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Ack immediately
   res.status(200).end();
 
-  const payload = JSON.parse(req.body.payload as string) as {
+  const params = new URLSearchParams(rawBody);
+  const payloadStr = params.get('payload');
+  if (!payloadStr) return;
+
+  const payload = JSON.parse(payloadStr) as {
     actions: Array<{ action_id: string; value: string }>;
   };
 
