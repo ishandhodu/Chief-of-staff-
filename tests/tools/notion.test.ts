@@ -43,6 +43,17 @@ describe('createTask', () => {
       pageId: 'page123',
       url: 'https://notion.so/page123',
     });
+
+    expect(mockPagesCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parent: { database_id: 'test-database-id' },
+        properties: expect.objectContaining({
+          Name: { title: [{ text: { content: 'Send investor deck' } }] },
+          Status: { select: { name: 'To Do' } },
+          Deadline: { date: { start: '2026-04-18' } },
+        }),
+      })
+    );
   });
 });
 
@@ -63,6 +74,13 @@ describe('searchPages', () => {
     const result = await searchPages({ query: 'investor' });
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe('Send investor deck');
+
+    expect(mockDatabasesQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        database_id: 'test-database-id',
+        filter: { property: 'Name', title: { contains: 'investor' } },
+      })
+    );
   });
 });
 
@@ -76,5 +94,32 @@ describe('updatePage', () => {
     });
 
     expect(result).toEqual({ success: true, pageId: 'page1' });
+
+    expect(mockPagesUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page_id: 'page1',
+        properties: expect.objectContaining({
+          Status: { select: { name: 'In Progress' } },
+        }),
+      })
+    );
+  });
+});
+
+describe('input validation', () => {
+  it('createTask throws when title is missing', async () => {
+    await expect(createTask({ deadline: '2026-04-18' })).rejects.toThrow('title');
+  });
+
+  it('searchPages throws when query is missing', async () => {
+    await expect(searchPages({})).rejects.toThrow('query');
+  });
+
+  it('updatePage throws when pageId is missing', async () => {
+    await expect(updatePage({ status: 'Done' })).rejects.toThrow('pageId');
+  });
+
+  it('updatePage throws when status is missing', async () => {
+    await expect(updatePage({ pageId: 'page1' })).rejects.toThrow('status');
   });
 });
