@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifySlackSignature } from '@/slack/verify';
+import { getRawBody } from '@/slack/raw-body';
 import { getApproval, deleteApproval } from '@/agent/approval-store';
 import { ALL_TOOLS } from '@/agent/tools';
 import { postMessage } from '@/tools/slack';
@@ -10,40 +11,43 @@ export const config = {
   },
 };
 
-async function getRawBody(req: VercelRequest): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
-    req.on('end', () => resolve(Buffer.concat(chunks).toString()));
-    req.on('error', reject);
-  });
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).end();
   }
 
   const rawBody = await getRawBody(req);
-  const signature = req.headers['x-slack-signature'] as string;
-  const timestamp = req.headers['x-slack-request-timestamp'] as string;
 
-  if (!verifySlackSignature(process.env.SLACK_SIGNING_SECRET!, signature, timestamp, rawBody)) {
+  const signingSecret = process.env.SLACK_SIGNING_SECRET;
+  if (!signingSecret) {
+    return res.status(500).json({ error: 'SLACK_SIGNING_SECRET not configured' });
+  }
+  const signature = req.headers['x-slack-signature'];
+  const timestamp = req.headers['x-slack-request-timestamp'];
+  if (typeof signature !== 'string' || typeof timestamp !== 'string') {
+    return res.status(401).json({ error: 'Missing Slack headers' });
+  }
+
+  if (!verifySlackSignature(signingSecret, signature, timestamp, rawBody)) {
     return res.status(401).json({ error: 'Invalid signature' });
   }
 
   // Ack immediately
   res.status(200).end();
 
-  const params = new URLSearchParams(rawBody);
-  const payloadStr = params.get('payload');
-  if (!payloadStr) return;
+  let payload: { actions: Array<{ action_id: string; value: string }> };
+  try {
+    const params = new URLSearchParams(rawBody);
+    const payloadStr = params.get('payload');
+    if (!payloadStr) return;
+    payload = JSON.parse(payloadStr);
+  } catch {
+    return;
+  }
 
-  const payload = JSON.parse(payloadStr) as {
-    actions: Array<{ action_id: string; value: string }>;
-  };
-
+  if (!payload.actions?.length) return;
   const action = payload.actions[0];
+
   const approvalId = action.value;
   const channelId = process.env.DIGEST_CHANNEL_ID!;
 
