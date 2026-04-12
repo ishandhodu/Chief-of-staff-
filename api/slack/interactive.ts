@@ -35,53 +35,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Ack immediately
   res.status(200).end();
 
-  let payload: { actions: Array<{ action_id: string; value: string }> };
+  const channelId = process.env.DIGEST_CHANNEL_ID;
+  if (!channelId) {
+    // Can't notify Slack since we don't have a channel ID
+    console.error('DIGEST_CHANNEL_ID not configured');
+    return;
+  }
+
   try {
-    const params = new URLSearchParams(rawBody);
-    const payloadStr = params.get('payload');
-    if (!payloadStr) return;
-    payload = JSON.parse(payloadStr);
-  } catch {
-    return;
-  }
-
-  if (!payload.actions?.length) return;
-  const action = payload.actions[0];
-
-  const approvalId = action.value;
-  const channelId = process.env.DIGEST_CHANNEL_ID!;
-
-  const approval = await getApproval(approvalId);
-  if (!approval) {
-    await postMessage({ channel: channelId, text: `Approval \`${approvalId}\` has expired or was already processed.` });
-    return;
-  }
-
-  if (action.action_id === 'cancel_action') {
-    await deleteApproval(approvalId);
-    await postMessage({ channel: channelId, text: `Cancelled: ${approval.description}` });
-    return;
-  }
-
-  if (action.action_id === 'approve_action') {
-    const tool = ALL_TOOLS.find((t) => t.name === approval.toolName);
-    if (!tool) {
-      await postMessage({ channel: channelId, text: `Error: tool \`${approval.toolName}\` not found.` });
+    let payload: { actions: Array<{ action_id: string; value: string }> };
+    try {
+      const params = new URLSearchParams(rawBody);
+      const payloadStr = params.get('payload');
+      if (!payloadStr) return;
+      payload = JSON.parse(payloadStr);
+    } catch {
       return;
     }
 
-    try {
-      const result = await tool.execute(approval.args);
-      await deleteApproval(approvalId);
-      await postMessage({
-        channel: channelId,
-        text: `Done: ${approval.description}\n\`\`\`${JSON.stringify(result, null, 2)}\`\`\``,
-      });
-    } catch (err) {
-      await postMessage({
-        channel: channelId,
-        text: `Error executing ${approval.toolName}: ${err instanceof Error ? err.message : String(err)}`,
-      });
+    if (!payload.actions?.length) return;
+    const action = payload.actions[0];
+
+    const approvalId = action.value;
+
+    const approval = await getApproval(approvalId);
+    if (!approval) {
+      await postMessage({ channel: channelId, text: `Approval \`${approvalId}\` has expired or was already processed.` });
+      return;
     }
+
+    if (action.action_id === 'cancel_action') {
+      await deleteApproval(approvalId);
+      await postMessage({ channel: channelId, text: `Cancelled: ${approval.description}` });
+      return;
+    }
+
+    if (action.action_id === 'approve_action') {
+      const tool = ALL_TOOLS.find((t) => t.name === approval.toolName);
+      if (!tool) {
+        await postMessage({ channel: channelId, text: `Error: tool \`${approval.toolName}\` not found.` });
+        return;
+      }
+
+      try {
+        const result = await tool.execute(approval.args);
+        await deleteApproval(approvalId);
+        await postMessage({
+          channel: channelId,
+          text: `Done: ${approval.description}\n\`\`\`${JSON.stringify(result, null, 2)}\`\`\``,
+        });
+      } catch (err) {
+        await postMessage({
+          channel: channelId,
+          text: `Error executing ${approval.toolName}: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    }
+  } catch (err) {
+    try {
+      await postMessage({ channel: channelId, text: `Error processing approval: ${err instanceof Error ? err.message : String(err)}` });
+    } catch { /* Slack notification failed */ }
   }
 }
