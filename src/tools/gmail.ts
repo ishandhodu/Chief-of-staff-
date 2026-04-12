@@ -177,16 +177,35 @@ export async function sendEmail(args: Record<string, unknown>): Promise<{ messag
   return { messageId };
 }
 
+async function getOrCreateLabel(
+  gmail: ReturnType<typeof google.gmail>,
+  name: string
+): Promise<string> {
+  const listRes = await gmail.users.labels.list({ userId: 'me' });
+  const existing = (listRes.data.labels ?? []).find(
+    (l) => l.name?.toLowerCase() === name.toLowerCase()
+  );
+  if (existing?.id) return existing.id;
+
+  const createRes = await gmail.users.labels.create({
+    userId: 'me',
+    requestBody: { name },
+  });
+  if (!createRes.data.id) throw new Error(`Failed to create label "${name}"`);
+  return createRes.data.id;
+}
+
 export async function labelEmail(args: Record<string, unknown>): Promise<{ success: boolean; messageId: string }> {
   if (typeof args.messageId !== 'string' || !args.messageId) throw new Error('labelEmail requires a non-empty "messageId" string');
   if (typeof args.label !== 'string' || !args.label) throw new Error('labelEmail requires a non-empty "label" string');
   const { messageId, label } = args as { messageId: string; label: string };
   const gmail = getGmailClient();
+  const labelId = await getOrCreateLabel(gmail, label);
 
   await gmail.users.messages.modify({
     userId: 'me',
     id: messageId,
-    requestBody: { addLabelIds: [label.toUpperCase()] },
+    requestBody: { addLabelIds: [labelId] },
   });
 
   return { success: true, messageId };

@@ -18,6 +18,10 @@ vi.mock('googleapis', () => ({
         drafts: {
           create: vi.fn(),
         },
+        labels: {
+          list: vi.fn(),
+          create: vi.fn(),
+        },
       },
     }),
   },
@@ -112,18 +116,53 @@ describe('searchThread', () => {
 });
 
 describe('labelEmail', () => {
-  it('applies the given label to an email', async () => {
+  it('creates label and applies it when label does not exist', async () => {
     const gmail = google.gmail({ version: 'v1' });
+    vi.mocked(gmail.users.labels.list).mockResolvedValue({
+      data: { labels: [] },
+    } as never);
+    vi.mocked(gmail.users.labels.create).mockResolvedValue({
+      data: { id: 'Label_urgent123' },
+    } as never);
     vi.mocked(gmail.users.messages.modify).mockResolvedValue({
       data: { id: 'msg1' },
     } as never);
 
     const result = await labelEmail({ messageId: 'msg1', label: 'urgent' });
     expect(result).toEqual({ success: true, messageId: 'msg1' });
+    expect(gmail.users.labels.list).toHaveBeenCalledWith({ userId: 'me' });
+    expect(gmail.users.labels.create).toHaveBeenCalledWith({
+      userId: 'me',
+      requestBody: { name: 'urgent' },
+    });
     expect(gmail.users.messages.modify).toHaveBeenCalledWith({
       userId: 'me',
       id: 'msg1',
-      requestBody: { addLabelIds: ['URGENT'] },
+      requestBody: { addLabelIds: ['Label_urgent123'] },
+    });
+  });
+
+  it('uses existing label ID without creating when label already exists', async () => {
+    const gmail = google.gmail({ version: 'v1' });
+    vi.mocked(gmail.users.labels.list).mockResolvedValue({
+      data: {
+        labels: [
+          { id: 'Label_existing456', name: 'Urgent' },
+        ],
+      },
+    } as never);
+    vi.mocked(gmail.users.messages.modify).mockResolvedValue({
+      data: { id: 'msg2' },
+    } as never);
+
+    const result = await labelEmail({ messageId: 'msg2', label: 'urgent' });
+    expect(result).toEqual({ success: true, messageId: 'msg2' });
+    expect(gmail.users.labels.list).toHaveBeenCalledWith({ userId: 'me' });
+    expect(gmail.users.labels.create).not.toHaveBeenCalled();
+    expect(gmail.users.messages.modify).toHaveBeenCalledWith({
+      userId: 'me',
+      id: 'msg2',
+      requestBody: { addLabelIds: ['Label_existing456'] },
     });
   });
 });
