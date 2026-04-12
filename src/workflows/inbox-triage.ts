@@ -1,0 +1,35 @@
+import type { Workflow, WorkflowContext } from '@/types';
+import { ALL_TOOLS } from '@/agent/tools';
+import { runAgentLoop } from '@/agent/loop';
+
+const TRIAGE_PROMPT = `
+You are an AI Chief of Staff. Your task is to triage the CEO's inbox.
+
+1. Call list_emails to fetch the 50 most recent unread emails.
+2. For each email, use label_email to apply one of these labels: urgent, needs-reply, FYI, newsletter, can-ignore.
+   - urgent: requires the CEO's attention today
+   - needs-reply: CEO should respond but not time-critical
+   - FYI: informational, no action needed
+   - newsletter: bulk/marketing email
+   - can-ignore: spam or low-value
+3. For emails labeled urgent or needs-reply, use save_draft to write a suggested reply.
+4. Summarize what you did: how many emails, how many in each category, what drafts you saved.
+
+Be concise. Do not explain your reasoning for every email — just do it and summarize.
+`.trim();
+
+export const inboxTriageWorkflow: Workflow = {
+  name: 'inbox-triage',
+  async run(ctx: WorkflowContext) {
+    const channelId = process.env.DIGEST_CHANNEL_ID!;
+    const result = await runAgentLoop(TRIAGE_PROMPT, ALL_TOOLS, channelId);
+
+    await ctx.postToSlack(`*Inbox Triage Complete*\n\n${result.summary}`);
+
+    for (const approval of result.pendingApprovals) {
+      await ctx.postToSlack(
+        `*Action requires your approval*\n\n${approval.description}\n\nApproval ID: \`${approval.id}\`\n_(Tap Approve or Cancel below)_`
+      );
+    }
+  },
+};
