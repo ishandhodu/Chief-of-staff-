@@ -11,7 +11,12 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
 
   try {
     const workflow = getWorkflow('inbox-triage');
-    await workflow?.run({ postToSlack });
+    if (!workflow) {
+      await postMessage({ channel: channelId, text: 'Inbox triage workflow not found in registry.' });
+      res.status(500).json({ error: 'workflow not found' });
+      return;
+    }
+    await workflow.run({ postToSlack });
     res.status(200).json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
