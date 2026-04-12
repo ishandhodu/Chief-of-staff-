@@ -48,12 +48,14 @@ export interface ConflictReport {
 
 export async function detectConflicts(_args: Record<string, unknown>): Promise<ConflictReport> {
   const events = await listTodayEvents({});
+  // Filter to timed events only — all-day events have date-only strings without 'T'
+  const timedEvents = events.filter(e => e.start.includes('T'));
   const conflicts: ConflictReport['conflicts'] = [];
 
-  for (let i = 0; i < events.length; i++) {
-    for (let j = i + 1; j < events.length; j++) {
-      const a = events[i];
-      const b = events[j];
+  for (let i = 0; i < timedEvents.length; i++) {
+    for (let j = i + 1; j < timedEvents.length; j++) {
+      const a = timedEvents[i];
+      const b = timedEvents[j];
       const aStart = new Date(a.start).getTime();
       const aEnd = new Date(a.end).getTime();
       const bStart = new Date(b.start).getTime();

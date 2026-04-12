@@ -73,6 +73,7 @@ describe('detectConflicts', () => {
       event1: 'Meeting A',
       event2: 'Meeting B',
     });
+    expect(result.conflicts[0].overlapMinutes).toBe(30);
   });
 
   it('returns no conflicts when events do not overlap', async () => {
