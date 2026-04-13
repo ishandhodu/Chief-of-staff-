@@ -775,47 +775,53 @@ async function handler(req, res) {
   if (!verifySlackSignature(signingSecret, signature, timestamp, rawBody)) {
     return res.status(401).json({ error: "Invalid signature" });
   }
-  res.status(200).json({ response_type: "in_channel", text: "Working on it..." });
+  const params = new URLSearchParams(rawBody);
+  const command = params.get("command") ?? "";
+  const text = params.get("text") ?? "";
+  const user_id = params.get("user_id") ?? "";
+  const response_url = params.get("response_url") ?? "";
   const channelId = process.env.DIGEST_CHANNEL_ID ?? "";
-  console.log("[commands] channelId:", channelId);
   const postToSlack = async (message) => {
-    console.log("[commands] posting to Slack:", message.slice(0, 100));
     await postMessage({ channel: channelId, text: message });
   };
-  try {
-    const params = new URLSearchParams(rawBody);
-    const command = params.get("command") ?? "";
-    const text = params.get("text") ?? "";
-    const user_id = params.get("user_id") ?? "";
-    console.log("[commands] command:", command, "user:", user_id);
-    if (command === "/triage") {
-      const workflow = getWorkflow("inbox-triage");
-      if (!workflow) {
-        await postToSlack("Workflow not found: inbox-triage");
-        return;
-      }
-      console.log("[commands] running inbox-triage workflow");
-      await workflow.run({ slackUserId: user_id, postToSlack });
-      console.log("[commands] inbox-triage workflow complete");
-    } else if (command === "/task") {
-      const workflow = getWorkflow("thread-to-task");
-      if (!workflow) {
-        await postToSlack("Workflow not found: thread-to-task");
-        return;
-      }
-      await workflow.run({ slackUserId: user_id, input: text, postToSlack });
-    } else {
-      await postToSlack(`Unknown command: ${command}`);
-    }
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error("[commands] error:", errorMsg, err instanceof Error ? err.stack : "");
+  const runAndRespond = async () => {
     try {
-      await postToSlack(`Error: ${errorMsg}`);
-    } catch (slackErr) {
-      console.error("[commands] failed to post error to Slack:", slackErr);
+      if (command === "/triage") {
+        const workflow = getWorkflow("inbox-triage");
+        if (!workflow) {
+          await fetch(response_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "Workflow not found: inbox-triage" }) });
+          return;
+        }
+        await workflow.run({ slackUserId: user_id, postToSlack });
+        await fetch(response_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "Triage complete." }) });
+      } else if (command === "/task") {
+        const workflow = getWorkflow("thread-to-task");
+        if (!workflow) {
+          await fetch(response_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "Workflow not found: thread-to-task" }) });
+          return;
+        }
+        await workflow.run({ slackUserId: user_id, input: text, postToSlack });
+        await fetch(response_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: "Task created." }) });
+      } else {
+        await postToSlack(`Unknown command: ${command}`);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : "";
+      console.error("[commands] error:", errorMsg, stack);
+      try {
+        await postMessage({ channel: channelId, text: `Error running ${command}: ${errorMsg}` });
+      } catch (e) {
+        console.error("[commands] failed to post error to Slack:", e);
+      }
+      if (response_url) {
+        await fetch(response_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: `Error: ${errorMsg}` }) }).catch(() => {
+        });
+      }
     }
-  }
+  };
+  res.status(200).json({ response_type: "in_channel", text: "Working on it..." });
+  await runAndRespond();
 }
 export {
   config,
