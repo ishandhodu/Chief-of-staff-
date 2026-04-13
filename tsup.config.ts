@@ -6,6 +6,7 @@ export default defineConfig({
     'slack/interactive': 'src/handlers/slack/interactive.ts',
     'cron/digest': 'src/handlers/cron/digest.ts',
     'cron/triage': 'src/handlers/cron/triage.ts',
+    'debug': 'src/handlers/debug.ts',
   },
   outDir: 'api',
   format: ['esm'],
