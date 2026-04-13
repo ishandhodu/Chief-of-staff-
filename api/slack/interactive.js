@@ -27,15 +27,14 @@ async function getRawBody(req) {
 }
 
 // src/agent/approval-store.ts
-import Redis from "ioredis";
-var redis = new Redis(process.env.chief_of_staff_REDIS_URL);
+var store = /* @__PURE__ */ new Map();
 var KEY_PREFIX = "approval:";
+var TTL_MS = 3600 * 1e3;
 async function getApproval(id) {
-  const raw = await redis.get(`${KEY_PREFIX}${id}`);
-  return raw ? JSON.parse(raw) : null;
+  return store.get(`${KEY_PREFIX}${id}`) ?? null;
 }
 async function deleteApproval(id) {
-  await redis.del(`${KEY_PREFIX}${id}`);
+  store.delete(`${KEY_PREFIX}${id}`);
 }
 
 // src/tools/gmail.ts

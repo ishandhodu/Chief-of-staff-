@@ -510,12 +510,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "crypto";
 
 // src/agent/approval-store.ts
-import Redis from "ioredis";
-var redis = new Redis(process.env.chief_of_staff_REDIS_URL);
+var store = /* @__PURE__ */ new Map();
 var KEY_PREFIX = "approval:";
-var TTL_SECONDS = 3600;
+var TTL_MS = 3600 * 1e3;
 async function saveApproval(request) {
-  await redis.set(`${KEY_PREFIX}${request.id}`, JSON.stringify(request), "EX", TTL_SECONDS);
+  store.set(`${KEY_PREFIX}${request.id}`, request);
+  setTimeout(() => store.delete(`${KEY_PREFIX}${request.id}`), TTL_MS);
 }
 
 // src/agent/loop.ts
