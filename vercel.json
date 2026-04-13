@@ -1,5 +1,6 @@
 {
   "buildCommand": "npm run build",
+  "outputDirectory": ".",
   "crons": [
     { "path": "/api/cron/digest", "schedule": "0 7 * * *" },
     { "path": "/api/cron/triage", "schedule": "0 */2 * * *" }
