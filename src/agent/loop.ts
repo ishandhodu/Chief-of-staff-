@@ -24,18 +24,27 @@ export async function runAgentLoop(
   }));
 
   for (let i = 0; i < maxIterations; i++) {
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      tools: anthropicTools,
-      messages,
-    });
+    let response: Anthropic.Message;
+    try {
+      response = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        tools: anthropicTools,
+        messages,
+      });
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      return {
+        summary: `Agent stopped: Claude API error on iteration ${i + 1}: ${errMsg}`,
+        pendingApprovals,
+      };
+    }
 
     messages.push({ role: 'assistant', content: response.content });
 
     if (response.stop_reason === 'end_turn') {
       const textBlock = response.content.find((b) => b.type === 'text') as Anthropic.TextBlock | undefined;
-      const summary = textBlock ? textBlock.text : '';
+      const summary = textBlock ? textBlock.text : '(No summary produced)';
       return { summary, pendingApprovals };
     }
 
@@ -97,7 +106,7 @@ export async function runAgentLoop(
   }
 
   return {
-    summary: `Agent reached max iterations (${maxIterations}). Partial results above.`,
+    summary: `Agent reached max iterations (${maxIterations}). Partial results may have been applied.`,
     pendingApprovals,
   };
 }

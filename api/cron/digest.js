@@ -491,7 +491,7 @@ var KEY_PREFIX = "approval:";
 var TTL_MS = 3600 * 1e3;
 async function saveApproval(request) {
   store.set(`${KEY_PREFIX}${request.id}`, request);
-  setTimeout(() => store.delete(`${KEY_PREFIX}${request.id}`), TTL_MS);
+  setTimeout(() => store.delete(`${KEY_PREFIX}${request.id}`), TTL_MS).unref();
 }
 
 // src/agent/loop.ts
@@ -507,16 +507,25 @@ async function runAgentLoop(prompt, tools, digestChannelId, maxIterations = 10) 
     input_schema: t.input_schema
   }));
   for (let i = 0; i < maxIterations; i++) {
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      tools: anthropicTools,
-      messages
-    });
+    let response;
+    try {
+      response = await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4096,
+        tools: anthropicTools,
+        messages
+      });
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      return {
+        summary: `Agent stopped: Claude API error on iteration ${i + 1}: ${errMsg}`,
+        pendingApprovals
+      };
+    }
     messages.push({ role: "assistant", content: response.content });
     if (response.stop_reason === "end_turn") {
       const textBlock = response.content.find((b) => b.type === "text");
-      const summary = textBlock ? textBlock.text : "";
+      const summary = textBlock ? textBlock.text : "(No summary produced)";
       return { summary, pendingApprovals };
     }
     if (response.stop_reason !== "tool_use") {
@@ -569,7 +578,7 @@ async function runAgentLoop(prompt, tools, digestChannelId, maxIterations = 10) 
     messages.push({ role: "user", content: toolResults });
   }
   return {
-    summary: `Agent reached max iterations (${maxIterations}). Partial results above.`,
+    summary: `Agent reached max iterations (${maxIterations}). Partial results may have been applied.`,
     pendingApprovals
   };
 }
@@ -621,7 +630,7 @@ async function postApprovalMessage(approval, channelId) {
 var TRIAGE_PROMPT = `
 You are an AI Chief of Staff. Your task is to triage the CEO's inbox.
 
-1. Call list_emails to fetch the 50 most recent unread emails.
+1. Call list_emails with maxResults 10 to fetch the 10 most recent unread emails.
 2. For each email, use label_email to apply one of these labels: urgent, needs-reply, FYI, newsletter, can-ignore.
    - urgent: requires the CEO's attention today
    - needs-reply: CEO should respond but not time-critical
@@ -691,7 +700,7 @@ var DIGEST_PROMPT = `
 You are an AI Chief of Staff preparing the CEO's morning briefing for today.
 
 Run these steps in parallel (call all three tools before synthesizing):
-1. list_emails \u2014 fetch the 50 most recent unread emails
+1. list_emails with maxResults 10 \u2014 fetch the 10 most recent unread emails
 2. list_today_events \u2014 get today's calendar
 3. search_pages \u2014 search Notion for tasks with query "To Do" to find open tasks
 

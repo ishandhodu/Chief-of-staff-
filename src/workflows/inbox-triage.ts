@@ -6,7 +6,7 @@ import { postApprovalMessage } from '../slack/approval.js';
 const TRIAGE_PROMPT = `
 You are an AI Chief of Staff. Your task is to triage the CEO's inbox.
 
-1. Call list_emails to fetch the 50 most recent unread emails.
+1. Call list_emails with maxResults 10 to fetch the 10 most recent unread emails.
 2. For each email, use label_email to apply one of these labels: urgent, needs-reply, FYI, newsletter, can-ignore.
    - urgent: requires the CEO's attention today
    - needs-reply: CEO should respond but not time-critical

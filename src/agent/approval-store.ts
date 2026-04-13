@@ -8,7 +8,7 @@ const TTL_MS = 3600 * 1000;
 
 export async function saveApproval(request: ApprovalRequest): Promise<void> {
   store.set(`${KEY_PREFIX}${request.id}`, request);
-  setTimeout(() => store.delete(`${KEY_PREFIX}${request.id}`), TTL_MS);
+  setTimeout(() => store.delete(`${KEY_PREFIX}${request.id}`), TTL_MS).unref();
 }
 
 export async function getApproval(id: string): Promise<ApprovalRequest | null> {

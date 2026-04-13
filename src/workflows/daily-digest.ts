@@ -6,7 +6,7 @@ const DIGEST_PROMPT = `
 You are an AI Chief of Staff preparing the CEO's morning briefing for today.
 
 Run these steps in parallel (call all three tools before synthesizing):
-1. list_emails — fetch the 50 most recent unread emails
+1. list_emails with maxResults 10 — fetch the 10 most recent unread emails
 2. list_today_events — get today's calendar
 3. search_pages — search Notion for tasks with query "To Do" to find open tasks
 
