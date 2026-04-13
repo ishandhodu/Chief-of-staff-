@@ -15,7 +15,7 @@ Then synthesize a structured morning briefing with these sections:
 **Good morning.** Here is your briefing for [today's date].
 
 **📧 Top Emails** (max 3 most urgent)
-- For each: sender, subject, one-sentence summary, suggested action
+- For each: sender, subject, one-sentence summary, suggested action, and a clickable Gmail link using https://mail.google.com/mail/u/0/#inbox/<messageId>
 
 **📅 Today's Calendar**
 - List each event with time and attendees

@@ -641,6 +641,7 @@ You are an AI Chief of Staff. Your task is to triage the CEO's inbox.
    Also call create_task for these emails with:
    - priority: "High" for urgent, "Medium" for needs-reply
 4. Summarize what you did: how many emails, how many in each category, what drafts and tasks you created.
+   For each email in the summary, include a clickable Gmail link using this format: https://mail.google.com/mail/u/0/#inbox/<messageId>
 
 Be concise. Do not explain your reasoning for every email \u2014 just do it and summarize.
 `.trim();
@@ -709,7 +710,7 @@ Then synthesize a structured morning briefing with these sections:
 **Good morning.** Here is your briefing for [today's date].
 
 **\u{1F4E7} Top Emails** (max 3 most urgent)
-- For each: sender, subject, one-sentence summary, suggested action
+- For each: sender, subject, one-sentence summary, suggested action, and a clickable Gmail link using https://mail.google.com/mail/u/0/#inbox/<messageId>
 
 **\u{1F4C5} Today's Calendar**
 - List each event with time and attendees
