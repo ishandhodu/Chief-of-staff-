@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getWorkflow } from '@/workflows/registry';
-import { postMessage } from '@/tools/slack';
+import { getWorkflow } from '../../src/workflows/registry.js';
+import { postMessage } from '../../src/tools/slack.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {

@@ -1,4 +1,4 @@
-import type { Workflow } from '@/types';
+import type { Workflow } from '../types.js';
 import { inboxTriageWorkflow } from './inbox-triage';
 import { threadToTaskWorkflow } from './thread-to-task';
 import { dailyDigestWorkflow } from './daily-digest';

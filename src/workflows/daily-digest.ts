@@ -1,6 +1,6 @@
-import type { Workflow, WorkflowContext } from '@/types';
-import { ALL_TOOLS } from '@/agent/tools';
-import { runAgentLoop } from '@/agent/loop';
+import type { Workflow, WorkflowContext } from '../types.js';
+import { ALL_TOOLS } from '../agent/tools.js';
+import { runAgentLoop } from '../agent/loop.js';
 
 const DIGEST_PROMPT = `
 You are an AI Chief of Staff preparing the CEO's morning briefing for today.

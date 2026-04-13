@@ -1,16 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@vercel/kv', () => ({
-  kv: {
+vi.mock('ioredis', () => {
+  const mockRedis = {
     set: vi.fn(),
     get: vi.fn(),
     del: vi.fn(),
-  },
-}));
+  };
+  return { default: vi.fn(() => mockRedis) };
+});
 
-import { kv } from '@vercel/kv';
+import Redis from 'ioredis';
 import { saveApproval, getApproval, deleteApproval } from '@/agent/approval-store';
 import type { ApprovalRequest } from '@/types';
+
+const mockRedis = new (Redis as any)();
 
 const mockRequest: ApprovalRequest = {
   id: 'test-uuid-1234',
@@ -24,25 +27,26 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('saveApproval', () => {
   it('saves an approval request to KV with 1hr TTL', async () => {
-    vi.mocked(kv.set).mockResolvedValue('OK');
+    mockRedis.set.mockResolvedValue('OK');
     await saveApproval(mockRequest);
-    expect(kv.set).toHaveBeenCalledWith(
+    expect(mockRedis.set).toHaveBeenCalledWith(
       `approval:${mockRequest.id}`,
-      mockRequest,
-      { ex: 3600 }
+      JSON.stringify(mockRequest),
+      'EX',
+      3600
     );
   });
 });
 
 describe('getApproval', () => {
   it('retrieves an approval request by ID', async () => {
-    vi.mocked(kv.get).mockResolvedValue(mockRequest);
+    mockRedis.get.mockResolvedValue(JSON.stringify(mockRequest));
     const result = await getApproval(mockRequest.id);
     expect(result).toEqual(mockRequest);
   });
 
   it('returns null when not found', async () => {
-    vi.mocked(kv.get).mockResolvedValue(null);
+    mockRedis.get.mockResolvedValue(null);
     const result = await getApproval('nonexistent');
     expect(result).toBeNull();
   });
@@ -50,8 +54,8 @@ describe('getApproval', () => {
 
 describe('deleteApproval', () => {
   it('deletes an approval request from KV', async () => {
-    vi.mocked(kv.del).mockResolvedValue(1);
+    mockRedis.del.mockResolvedValue(1);
     await deleteApproval(mockRequest.id);
-    expect(kv.del).toHaveBeenCalledWith(`approval:${mockRequest.id}`);
+    expect(mockRedis.del).toHaveBeenCalledWith(`approval:${mockRequest.id}`);
   });
 });

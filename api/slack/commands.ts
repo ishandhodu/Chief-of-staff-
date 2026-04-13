@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifySlackSignature } from '@/slack/verify';
-import { getRawBody } from '@/slack/raw-body';
-import { getWorkflow } from '@/workflows/registry';
-import { postMessage } from '@/tools/slack';
+import { verifySlackSignature } from '../../src/slack/verify.js';
+import { getRawBody } from '../../src/slack/raw-body.js';
+import { getWorkflow } from '../../src/workflows/registry.js';
+import { postMessage } from '../../src/tools/slack.js';
 
 export const config = {
   api: {

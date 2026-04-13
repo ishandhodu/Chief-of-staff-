@@ -1,6 +1,6 @@
-import type { Workflow, WorkflowContext } from '@/types';
-import { ALL_TOOLS } from '@/agent/tools';
-import { runAgentLoop } from '@/agent/loop';
+import type { Workflow, WorkflowContext } from '../types.js';
+import { ALL_TOOLS } from '../agent/tools.js';
+import { runAgentLoop } from '../agent/loop.js';
 
 export const threadToTaskWorkflow: Workflow = {
   name: 'thread-to-task',

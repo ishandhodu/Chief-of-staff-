@@ -1,7 +1,7 @@
-import type { Workflow, WorkflowContext } from '@/types';
-import { ALL_TOOLS } from '@/agent/tools';
-import { runAgentLoop } from '@/agent/loop';
-import { postApprovalMessage } from '@/slack/approval';
+import type { Workflow, WorkflowContext } from '../types.js';
+import { ALL_TOOLS } from '../agent/tools.js';
+import { runAgentLoop } from '../agent/loop.js';
+import { postApprovalMessage } from '../slack/approval.js';
 
 const TRIAGE_PROMPT = `
 You are an AI Chief of Staff. Your task is to triage the CEO's inbox.

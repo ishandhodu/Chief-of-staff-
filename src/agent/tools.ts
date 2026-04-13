@@ -1,8 +1,8 @@
-import type { Tool } from '@/types';
-import { listEmails, searchThread, saveDraft, sendEmail, labelEmail } from '@/tools/gmail';
-import { listTodayEvents, detectConflicts } from '@/tools/calendar';
-import { createTask, searchPages, updatePage } from '@/tools/notion';
-import { postMessage } from '@/tools/slack';
+import type { Tool } from '../types.js';
+import { listEmails, searchThread, saveDraft, sendEmail, labelEmail } from '../tools/gmail.js';
+import { listTodayEvents, detectConflicts } from '../tools/calendar.js';
+import { createTask, searchPages, updatePage } from '../tools/notion.js';
+import { postMessage } from '../tools/slack.js';
 import { getRiskLevel } from './autonomy';
 
 const toolDefs: Omit<Tool, 'riskLevel'>[] = [

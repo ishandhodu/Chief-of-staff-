@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifySlackSignature } from '@/slack/verify';
-import { getRawBody } from '@/slack/raw-body';
-import { getApproval, deleteApproval } from '@/agent/approval-store';
-import { ALL_TOOLS } from '@/agent/tools';
-import { postMessage } from '@/tools/slack';
+import { verifySlackSignature } from '../../src/slack/verify.js';
+import { getRawBody } from '../../src/slack/raw-body.js';
+import { getApproval, deleteApproval } from '../../src/agent/approval-store.js';
+import { ALL_TOOLS } from '../../src/agent/tools.js';
+import { postMessage } from '../../src/tools/slack.js';
 
 export const config = {
   api: {

@@ -1,5 +1,5 @@
 import { WebClient } from '@slack/web-api';
-import type { ApprovalRequest } from '@/types';
+import type { ApprovalRequest } from '../types.js';
 
 export async function postApprovalMessage(
   approval: ApprovalRequest,
