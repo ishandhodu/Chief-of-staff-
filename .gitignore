@@ -7,4 +7,3 @@ dist/
 .vercel
 .env*.local
 scripts/run-token.sh
-api/**/*.js
