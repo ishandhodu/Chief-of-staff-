@@ -6,3 +6,4 @@ dist/
 *.tsbuildinfo
 .vercel
 .env*.local
+scripts/run-token.sh
