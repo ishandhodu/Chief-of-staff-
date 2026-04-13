@@ -36,7 +36,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Process async after response is sent
   const channelId = process.env.DIGEST_CHANNEL_ID ?? '';
+  console.log('[commands] channelId:', channelId);
+
   const postToSlack = async (message: string) => {
+    console.log('[commands] posting to Slack:', message.slice(0, 100));
     await postMessage({ channel: channelId, text: message });
   };
 
@@ -45,11 +48,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const command = params.get('command') ?? '';
     const text = params.get('text') ?? '';
     const user_id = params.get('user_id') ?? '';
+    console.log('[commands] command:', command, 'user:', user_id);
 
     if (command === '/triage') {
       const workflow = getWorkflow('inbox-triage');
       if (!workflow) { await postToSlack('Workflow not found: inbox-triage'); return; }
+      console.log('[commands] running inbox-triage workflow');
       await workflow.run({ slackUserId: user_id, postToSlack });
+      console.log('[commands] inbox-triage workflow complete');
     } else if (command === '/task') {
       const workflow = getWorkflow('thread-to-task');
       if (!workflow) { await postToSlack('Workflow not found: thread-to-task'); return; }
@@ -58,8 +64,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await postToSlack(`Unknown command: ${command}`);
     }
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error('[commands] error:', errorMsg, err instanceof Error ? err.stack : '');
     try {
-      await postToSlack(`Error processing command: ${err instanceof Error ? err.message : String(err)}`);
-    } catch { /* Slack notification failed */ }
+      await postToSlack(`Error: ${errorMsg}`);
+    } catch (slackErr) {
+      console.error('[commands] failed to post error to Slack:', slackErr);
+    }
   }
 }
