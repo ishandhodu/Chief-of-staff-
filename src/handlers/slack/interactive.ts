@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifySlackSignature } from '../../src/slack/verify.js';
-import { getRawBody } from '../../src/slack/raw-body.js';
-import { getApproval, deleteApproval } from '../../src/agent/approval-store.js';
-import { ALL_TOOLS } from '../../src/agent/tools.js';
-import { postMessage } from '../../src/tools/slack.js';
+import { verifySlackSignature } from '../../slack/verify.js';
+import { getRawBody } from '../../slack/raw-body.js';
+import { getApproval, deleteApproval } from '../../agent/approval-store.js';
+import { ALL_TOOLS } from '../../agent/tools.js';
+import { postMessage } from '../../tools/slack.js';
 
 export const config = {
   api: {
@@ -37,7 +37,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const channelId = process.env.DIGEST_CHANNEL_ID;
   if (!channelId) {
-    // Can't notify Slack since we don't have a channel ID
     console.error('DIGEST_CHANNEL_ID not configured');
     return;
   }

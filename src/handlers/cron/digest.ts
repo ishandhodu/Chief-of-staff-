@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getWorkflow } from '../../src/workflows/registry.js';
-import { postMessage } from '../../src/tools/slack.js';
+import { getWorkflow } from '../../workflows/registry.js';
+import { postMessage } from '../../tools/slack.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -17,9 +17,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    const workflow = getWorkflow('inbox-triage');
+    const workflow = getWorkflow('daily-digest');
     if (!workflow) {
-      await postMessage({ channel: channelId, text: 'Inbox triage workflow not found in registry.' });
+      await postMessage({ channel: channelId, text: 'Daily digest workflow not found in registry.' });
       res.status(500).json({ error: 'workflow not found' });
       return;
     }
@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     try {
-      await postMessage({ channel: channelId, text: `Inbox triage failed: ${message}` });
+      await postMessage({ channel: channelId, text: `Daily digest failed: ${message}` });
     } catch { /* Slack notification failed */ }
     res.status(500).json({ error: message });
   }
