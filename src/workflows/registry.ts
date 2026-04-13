@@ -1,7 +1,7 @@
 import type { Workflow } from '../types.js';
-import { inboxTriageWorkflow } from './inbox-triage';
-import { threadToTaskWorkflow } from './thread-to-task';
-import { dailyDigestWorkflow } from './daily-digest';
+import { inboxTriageWorkflow } from './inbox-triage.js';
+import { threadToTaskWorkflow } from './thread-to-task.js';
+import { dailyDigestWorkflow } from './daily-digest.js';
 
 const workflows: Map<string, Workflow> = new Map([
   ['inbox-triage', inboxTriageWorkflow],

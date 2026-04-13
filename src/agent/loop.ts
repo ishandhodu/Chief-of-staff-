@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { randomUUID } from 'crypto';
 import type { Tool, AgentResult, ApprovalRequest } from '../types.js';
-import { saveApproval } from './approval-store';
+import { saveApproval } from './approval-store.js';
 
 export async function runAgentLoop(
   prompt: string,

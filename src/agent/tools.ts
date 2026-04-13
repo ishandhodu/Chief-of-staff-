@@ -3,7 +3,7 @@ import { listEmails, searchThread, saveDraft, sendEmail, labelEmail } from '../t
 import { listTodayEvents, detectConflicts } from '../tools/calendar.js';
 import { createTask, searchPages, updatePage } from '../tools/notion.js';
 import { postMessage } from '../tools/slack.js';
-import { getRiskLevel } from './autonomy';
+import { getRiskLevel } from './autonomy.js';
 
 const toolDefs: Omit<Tool, 'riskLevel'>[] = [
   {
