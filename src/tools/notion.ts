@@ -15,11 +15,12 @@ export async function createTask(args: Record<string, unknown>): Promise<NotionT
     throw new Error('createTask requires a non-empty title string');
   }
 
-  const { deadline, stakeholders, context, sourceId } = args as {
+  const { deadline, stakeholders, context, sourceId, priority } = args as {
     deadline?: string;
     stakeholders?: string;
     context?: string;
     sourceId?: string;
+    priority?: string;
   };
 
   const notion = getNotionClient();
@@ -42,6 +43,9 @@ export async function createTask(args: Record<string, unknown>): Promise<NotionT
   }
   if (sourceId) {
     properties['Source'] = { rich_text: [{ text: { content: sourceId } }] };
+  }
+  if (priority) {
+    properties['Priority'] = { select: { name: priority } };
   }
 
   const res = await notion.pages.create({

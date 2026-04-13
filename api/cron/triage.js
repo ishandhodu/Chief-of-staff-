@@ -225,7 +225,7 @@ async function createTask(args) {
   if (!title || typeof title !== "string") {
     throw new Error("createTask requires a non-empty title string");
   }
-  const { deadline, stakeholders, context, sourceId } = args;
+  const { deadline, stakeholders, context, sourceId, priority } = args;
   const notion = getNotionClient();
   const databaseId = process.env.NOTION_DATABASE_ID;
   if (!databaseId) throw new Error("NOTION_DATABASE_ID environment variable is not set");
@@ -244,6 +244,9 @@ async function createTask(args) {
   }
   if (sourceId) {
     properties["Source"] = { rich_text: [{ text: { content: sourceId } }] };
+  }
+  if (priority) {
+    properties["Priority"] = { select: { name: priority } };
   }
   const res = await notion.pages.create({
     parent: { database_id: databaseId },
@@ -427,7 +430,8 @@ var toolDefs = [
         deadline: { type: "string", description: "Deadline in YYYY-MM-DD format" },
         stakeholders: { type: "string", description: "Comma-separated stakeholder names or emails" },
         context: { type: "string", description: "Brief context summary" },
-        sourceId: { type: "string", description: "Gmail message or thread ID this task came from" }
+        sourceId: { type: "string", description: "Gmail message or thread ID this task came from" },
+        priority: { type: "string", description: "Task priority: High, Medium, or Low" }
       },
       required: ["title"]
     },
@@ -625,7 +629,9 @@ You are an AI Chief of Staff. Your task is to triage the CEO's inbox.
    - newsletter: bulk/marketing email
    - can-ignore: spam or low-value
 3. For emails labeled urgent or needs-reply, use save_draft to write a suggested reply.
-4. Summarize what you did: how many emails, how many in each category, what drafts you saved.
+   Also call create_task for these emails with:
+   - priority: "High" for urgent, "Medium" for needs-reply
+4. Summarize what you did: how many emails, how many in each category, what drafts and tasks you created.
 
 Be concise. Do not explain your reasoning for every email \u2014 just do it and summarize.
 `.trim();
@@ -669,7 +675,8 @@ Steps:
    - Deadline (if mentioned, in YYYY-MM-DD format; otherwise omit)
    - Stakeholders (people involved \u2014 names and/or emails)
    - A 1-2 sentence context summary
-4. Call create_task with the extracted information and set sourceId to the email message ID.
+   - Priority: "High" if time-sensitive or from an important stakeholder, "Medium" if a clear action is needed but not urgent, "Low" otherwise
+4. Call create_task with the extracted information, set sourceId to the email message ID, and include the priority.
 5. Report the Notion page URL in your final response.
 
 If no thread is found, report that clearly.

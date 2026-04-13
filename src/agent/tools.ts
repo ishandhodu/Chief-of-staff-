@@ -94,6 +94,7 @@ const toolDefs: Omit<Tool, 'riskLevel'>[] = [
         stakeholders: { type: 'string', description: 'Comma-separated stakeholder names or emails' },
         context: { type: 'string', description: 'Brief context summary' },
         sourceId: { type: 'string', description: 'Gmail message or thread ID this task came from' },
+        priority: { type: 'string', description: 'Task priority: High, Medium, or Low' },
       },
       required: ['title'],
     },

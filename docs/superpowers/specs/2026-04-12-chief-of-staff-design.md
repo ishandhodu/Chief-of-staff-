@@ -296,3 +296,4 @@ Adding a new workflow requires:
 4. At least one HIGH-RISK action surfaces an approval button in Slack
 5. System handles an unavailable API gracefully without crashing
 6. All secrets are stored in Vercel Environment Variables, none in the repo
+

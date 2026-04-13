@@ -28,7 +28,8 @@ Steps:
    - Deadline (if mentioned, in YYYY-MM-DD format; otherwise omit)
    - Stakeholders (people involved — names and/or emails)
    - A 1-2 sentence context summary
-4. Call create_task with the extracted information and set sourceId to the email message ID.
+   - Priority: "High" if time-sensitive or from an important stakeholder, "Medium" if a clear action is needed but not urgent, "Low" otherwise
+4. Call create_task with the extracted information, set sourceId to the email message ID, and include the priority.
 5. Report the Notion page URL in your final response.
 
 If no thread is found, report that clearly.

@@ -264,7 +264,7 @@ async function createTask(args) {
   if (!title || typeof title !== "string") {
     throw new Error("createTask requires a non-empty title string");
   }
-  const { deadline, stakeholders, context, sourceId } = args;
+  const { deadline, stakeholders, context, sourceId, priority } = args;
   const notion = getNotionClient();
   const databaseId = process.env.NOTION_DATABASE_ID;
   if (!databaseId) throw new Error("NOTION_DATABASE_ID environment variable is not set");
@@ -283,6 +283,9 @@ async function createTask(args) {
   }
   if (sourceId) {
     properties["Source"] = { rich_text: [{ text: { content: sourceId } }] };
+  }
+  if (priority) {
+    properties["Priority"] = { select: { name: priority } };
   }
   const res = await notion.pages.create({
     parent: { database_id: databaseId },
@@ -466,7 +469,8 @@ var toolDefs = [
         deadline: { type: "string", description: "Deadline in YYYY-MM-DD format" },
         stakeholders: { type: "string", description: "Comma-separated stakeholder names or emails" },
         context: { type: "string", description: "Brief context summary" },
-        sourceId: { type: "string", description: "Gmail message or thread ID this task came from" }
+        sourceId: { type: "string", description: "Gmail message or thread ID this task came from" },
+        priority: { type: "string", description: "Task priority: High, Medium, or Low" }
       },
       required: ["title"]
     },
