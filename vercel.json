@@ -5,9 +5,6 @@
     { "path": "/api/cron/triage", "schedule": "0 */2 * * *" }
   ],
   "functions": {
-    "dist/api/**/*.js": { "maxDuration": 300 }
-  },
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "/dist/api/:path*" }
-  ]
+    "api/**/*.js": { "maxDuration": 300 }
+  }
 }

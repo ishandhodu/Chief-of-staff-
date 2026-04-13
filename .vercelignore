@@ -1,3 +1,3 @@
 src/
-api/
 tests/
+api/**/*.ts

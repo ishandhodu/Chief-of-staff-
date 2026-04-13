@@ -2,16 +2,16 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: {
-    'api/slack/commands': 'api/slack/commands.ts',
-    'api/slack/interactive': 'api/slack/interactive.ts',
-    'api/cron/digest': 'api/cron/digest.ts',
-    'api/cron/triage': 'api/cron/triage.ts',
+    'slack/commands': 'api/slack/commands.ts',
+    'slack/interactive': 'api/slack/interactive.ts',
+    'cron/digest': 'api/cron/digest.ts',
+    'cron/triage': 'api/cron/triage.ts',
   },
-  outDir: 'dist',
+  outDir: 'api',
   format: ['esm'],
   bundle: true,
   splitting: false,
-  clean: true,
+  clean: false,
   dts: false,
   sourcemap: false,
 });
