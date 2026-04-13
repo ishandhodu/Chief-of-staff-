@@ -35,17 +35,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user_id = params.get('user_id') ?? '';
   const channelId = process.env.DIGEST_CHANNEL_ID ?? '';
 
-  // Fire-and-forget: trigger the process function independently
-  const baseUrl = `https://${req.headers.host}`;
-  fetch(`${baseUrl}/api/process`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-internal-secret': process.env.CRON_SECRET ?? '',
-    },
-    body: JSON.stringify({ command, text, user_id, channelId }),
-  }).catch(err => console.error('[commands] failed to trigger process:', err));
+  // Send 200 to Slack immediately so it doesn't show a timeout error
+  res.status(200).json({ response_type: 'in_channel', text: 'Working on it...' });
 
-  // Ack Slack immediately
-  return res.status(200).json({ response_type: 'in_channel', text: 'Working on it...' });
+  // Await the process fetch — this keeps the handler alive so the request actually sends
+  const baseUrl = `https://${req.headers.host}`;
+  try {
+    await fetch(`${baseUrl}/api/process`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': process.env.CRON_SECRET ?? '',
+      },
+      body: JSON.stringify({ command, text, user_id, channelId }),
+    });
+  } catch (err) {
+    console.error('[commands] process fetch failed:', err);
+  }
 }

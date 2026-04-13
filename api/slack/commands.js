@@ -54,16 +54,20 @@ async function handler(req, res) {
   const text = params.get("text") ?? "";
   const user_id = params.get("user_id") ?? "";
   const channelId = process.env.DIGEST_CHANNEL_ID ?? "";
+  res.status(200).json({ response_type: "in_channel", text: "Working on it..." });
   const baseUrl = `https://${req.headers.host}`;
-  fetch(`${baseUrl}/api/process`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-internal-secret": process.env.CRON_SECRET ?? ""
-    },
-    body: JSON.stringify({ command, text, user_id, channelId })
-  }).catch((err) => console.error("[commands] failed to trigger process:", err));
-  return res.status(200).json({ response_type: "in_channel", text: "Working on it..." });
+  try {
+    await fetch(`${baseUrl}/api/process`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": process.env.CRON_SECRET ?? ""
+      },
+      body: JSON.stringify({ command, text, user_id, channelId })
+    });
+  } catch (err) {
+    console.error("[commands] process fetch failed:", err);
+  }
 }
 export {
   config,
