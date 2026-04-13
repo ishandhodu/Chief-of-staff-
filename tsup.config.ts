@@ -7,6 +7,7 @@ export default defineConfig({
     'cron/digest': 'src/handlers/cron/digest.ts',
     'cron/triage': 'src/handlers/cron/triage.ts',
     'debug': 'src/handlers/debug.ts',
+    'process': 'src/handlers/process.ts',
   },
   outDir: 'api',
   format: ['esm'],
