@@ -1,10 +1,13 @@
 {
-  "outputDirectory": ".",
+  "buildCommand": "npm run build",
   "crons": [
     { "path": "/api/cron/digest", "schedule": "0 7 * * *" },
     { "path": "/api/cron/triage", "schedule": "0 */2 * * *" }
   ],
   "functions": {
-    "api/**/*.ts": { "maxDuration": 300 }
-  }
+    "dist/api/**/*.js": { "maxDuration": 300 }
+  },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/dist/api/:path*" }
+  ]
 }
