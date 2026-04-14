@@ -22,9 +22,9 @@ The core design principle: the agent should do the work, not summarize it for yo
 |---------|-------------|
 | `/triage` | Reads your 10 most recent unread emails, classifies each one, writes draft replies for anything urgent or needing a response, and creates Notion tasks |
 | `/task [query]` | Searches for a specific email thread and turns it into a structured Notion task with deadline, stakeholders, priority, and context |
-| `/cal [instruction]` | Manages your Google Calendar in plain English — move events, cancel them, reschedule them, with automatic conflict detection |
+| `/cal [instruction]` | Manages your Google Calendar in plain English: move events, cancel them, reschedule them, with automatic conflict detection |
 | `/todos` | Lists all open tasks from your Notion database |
-| `/learn [instruction]` | Teaches the agent something new — a contact rule, a deadline, or a current priority — with optional expiry dates |
+| `/learn [instruction]` | Teaches the agent something new, a contact rule: a deadline, or a current priority — with optional expiry dates |
 
 ### Automated Runs
 
