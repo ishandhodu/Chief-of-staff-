@@ -19,15 +19,20 @@ export const listTodosWorkflow: Workflow = {
       grouped[key].push(task);
     }
 
+    const databaseId = process.env.NOTION_DATABASE_ID ?? '';
+    const dbUrl = `https://www.notion.so/${databaseId.replace(/-/g, '')}`;
+
     const lines: string[] = [`*Open Tasks (${tasks.length})*\n`];
 
     for (const [status, items] of Object.entries(grouped)) {
       lines.push(`*${status}*`);
       for (const item of items) {
-        lines.push(`  • <${item.url}|${item.title}>`);
+        lines.push(`  • ${item.title}`);
       }
       lines.push('');
     }
+
+    lines.push(`<${dbUrl}|View all in Notion>`);
 
     await ctx.postToSlack(lines.join('\n'));
   },
