@@ -174,7 +174,6 @@ describe('saveMemory', () => {
     await expect(
       saveMemory({ subject: 'x', type: 'Contact', rule: 'y', raw: 'z' })
     ).rejects.toThrow('NOTION_MEMORY_DATABASE_ID');
-    process.env.NOTION_MEMORY_DATABASE_ID = 'test-memory-db-id';
   });
 });
 
@@ -240,5 +239,10 @@ describe('listMemories', () => {
     const result = await listMemories();
     expect(result).toHaveLength(1);
     expect(result[0].pageId).toBe('active');
+  });
+
+  it('throws when NOTION_MEMORY_DATABASE_ID is not set', async () => {
+    delete process.env.NOTION_MEMORY_DATABASE_ID;
+    await expect(listMemories()).rejects.toThrow('NOTION_MEMORY_DATABASE_ID');
   });
 });
