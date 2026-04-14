@@ -42,8 +42,9 @@ Output: {"type":"Deadline","subject":"home insurance renewal","rule":"flag any r
     | undefined;
   if (!textBlock) throw new Error('Claude returned no text response');
 
-  const jsonText = textBlock.text.replace(/```(?:json)?\n?/g, '').trim();
-  return JSON.parse(jsonText) as ParsedMemory;
+  const match = textBlock.text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('Claude response contained no JSON object');
+  return JSON.parse(match[0]) as ParsedMemory;
 }
 
 export const learnMemoryWorkflow: Workflow = {
@@ -55,7 +56,14 @@ export const learnMemoryWorkflow: Workflow = {
       return;
     }
 
-    const parsed = await parseMemory(raw);
+    let parsed: ParsedMemory;
+    try {
+      parsed = await parseMemory(raw);
+    } catch {
+      await ctx.postToSlack('Sorry, I couldn\'t understand that. Try: `/learn ishan@example.com is my investor, always urgent`');
+      return;
+    }
+
     await saveMemory({ ...parsed, raw });
 
     let confirmation: string;
