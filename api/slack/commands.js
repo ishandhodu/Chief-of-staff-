@@ -384,6 +384,28 @@ async function searchPages(args) {
     };
   });
 }
+async function listTasks(_args) {
+  const notion = getNotionClient();
+  const databaseId = process.env.NOTION_DATABASE_ID;
+  if (!databaseId) throw new Error("NOTION_DATABASE_ID environment variable is not set");
+  const res = await notion.databases.query({
+    database_id: databaseId,
+    filter: {
+      property: "Status",
+      select: { does_not_equal: "Done" }
+    },
+    page_size: 50
+  });
+  return res.results.map((page) => {
+    const p = page;
+    return {
+      pageId: p.id,
+      title: p.properties.Name.title[0]?.plain_text ?? "(untitled)",
+      status: p.properties.Status.select?.name ?? "Unknown",
+      url: p.url
+    };
+  });
+}
 async function updatePage(args) {
   const pageId = args.pageId;
   const status = args.status;
@@ -921,12 +943,41 @@ If no matching event is found, report that clearly. If the instruction is ambigu
   }
 };
 
+// src/workflows/list-todos.ts
+var listTodosWorkflow = {
+  name: "list-todos",
+  async run(ctx) {
+    const tasks = await listTasks({});
+    if (tasks.length === 0) {
+      await ctx.postToSlack("No open tasks found in Notion.");
+      return;
+    }
+    const grouped = {};
+    for (const task of tasks) {
+      const key = task.status;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(task);
+    }
+    const lines = [`*Open Tasks (${tasks.length})*
+`];
+    for (const [status, items] of Object.entries(grouped)) {
+      lines.push(`*${status}*`);
+      for (const item of items) {
+        lines.push(`  \u2022 <${item.url}|${item.title}>`);
+      }
+      lines.push("");
+    }
+    await ctx.postToSlack(lines.join("\n"));
+  }
+};
+
 // src/workflows/registry.ts
 var workflows = /* @__PURE__ */ new Map([
   ["inbox-triage", inboxTriageWorkflow],
   ["thread-to-task", threadToTaskWorkflow],
   ["daily-digest", dailyDigestWorkflow],
-  ["calendar-manage", calendarManageWorkflow]
+  ["calendar-manage", calendarManageWorkflow],
+  ["list-todos", listTodosWorkflow]
 ]);
 function getWorkflow(name) {
   return workflows.get(name);
@@ -987,6 +1038,13 @@ async function handler(req, res) {
             await postToSlack("Workflow not found: calendar-manage");
           } else {
             await workflow.run({ slackUserId: user_id, input: text, postToSlack });
+          }
+        } else if (command === "/todos") {
+          const workflow = getWorkflow("list-todos");
+          if (!workflow) {
+            await postToSlack("Workflow not found: list-todos");
+          } else {
+            await workflow.run({ slackUserId: user_id, postToSlack });
           }
         } else {
           await postToSlack(`Unknown command: ${command}`);

@@ -70,6 +70,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           } else {
             await workflow.run({ slackUserId: user_id, input: text, postToSlack });
           }
+        } else if (command === '/todos') {
+          const workflow = getWorkflow('list-todos');
+          if (!workflow) {
+            await postToSlack('Workflow not found: list-todos');
+          } else {
+            await workflow.run({ slackUserId: user_id, postToSlack });
+          }
         } else {
           await postToSlack(`Unknown command: ${command}`);
         }
