@@ -77,6 +77,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           } else {
             await workflow.run({ slackUserId: user_id, postToSlack });
           }
+        } else if (command === '/learn') {
+          const workflow = getWorkflow('learn-memory');
+          if (!workflow) {
+            await postToSlack('Workflow not found: learn-memory');
+          } else {
+            await workflow.run({ slackUserId: user_id, input: text, postToSlack });
+          }
         } else {
           await postToSlack(`Unknown command: ${command}`);
         }
