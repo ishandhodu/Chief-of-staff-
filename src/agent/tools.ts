@@ -1,6 +1,6 @@
 import type { Tool } from '../types.js';
 import { listEmails, searchThread, saveDraft, sendEmail, labelEmail } from '../tools/gmail.js';
-import { listTodayEvents, detectConflicts, updateEvent, deleteEvent } from '../tools/calendar.js';
+import { listTodayEvents, listEvents, detectConflicts, updateEvent, deleteEvent } from '../tools/calendar.js';
 import { createTask, searchPages, updatePage } from '../tools/notion.js';
 import { postMessage } from '../tools/slack.js';
 import { getRiskLevel } from './autonomy.js';
@@ -76,6 +76,18 @@ const toolDefs: Omit<Tool, 'riskLevel'>[] = [
     description: 'Get all calendar events scheduled for today.',
     input_schema: { type: 'object', properties: {}, required: [] },
     execute: listTodayEvents,
+  },
+  {
+    name: 'list_events',
+    description: 'Get all calendar events for a specific date (any date, not just today).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format, e.g. 2026-04-14' },
+      },
+      required: ['date'],
+    },
+    execute: listEvents,
   },
   {
     name: 'detect_conflicts',

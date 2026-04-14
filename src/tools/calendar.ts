@@ -18,11 +18,20 @@ export interface CalendarEvent {
   description: string;
 }
 
+function toEastern(date: Date): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)!.value, 10);
+  return { year: get('year'), month: get('month') - 1, day: get('day') };
+}
+
 export async function listTodayEvents(_args: Record<string, unknown>): Promise<CalendarEvent[]> {
   const calendar = getCalendarClient();
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+  const { year, month, day } = toEastern(new Date());
+  const startOfDay = new Date(Date.UTC(year, month, day, 4, 0, 0)).toISOString(); // midnight ET = 4am UTC (EST) or 4am UTC
+  const endOfDay = new Date(Date.UTC(year, month, day + 1, 3, 59, 59)).toISOString(); // 11:59pm ET
 
   const res = await calendar.events.list({
     calendarId: 'primary',
@@ -30,6 +39,7 @@ export async function listTodayEvents(_args: Record<string, unknown>): Promise<C
     timeMax: endOfDay,
     singleEvents: true,
     orderBy: 'startTime',
+    timeZone: 'America/New_York',
   });
 
   return (res.data.items ?? []).map((item) => ({
@@ -75,6 +85,35 @@ export async function detectConflicts(_args: Record<string, unknown>): Promise<C
   }
 
   return { conflicts };
+}
+
+export async function listEvents(args: Record<string, unknown>): Promise<CalendarEvent[]> {
+  const calendar = getCalendarClient();
+  const date = args.date as string | undefined;
+  if (!date || typeof date !== 'string') {
+    throw new Error('listEvents requires a date in YYYY-MM-DD format');
+  }
+
+  const timeMin = `${date}T00:00:00-04:00`;
+  const timeMax = `${date}T23:59:59-04:00`;
+
+  const res = await calendar.events.list({
+    calendarId: 'primary',
+    timeMin,
+    timeMax,
+    singleEvents: true,
+    orderBy: 'startTime',
+    timeZone: 'America/New_York',
+  });
+
+  return (res.data.items ?? []).map((item) => ({
+    id: item.id ?? '',
+    title: item.summary ?? '(no title)',
+    start: item.start?.dateTime ?? item.start?.date ?? '',
+    end: item.end?.dateTime ?? item.end?.date ?? '',
+    attendees: (item.attendees ?? []).map((a) => a.email ?? '').filter(Boolean),
+    description: item.description ?? '',
+  }));
 }
 
 export async function updateEvent(args: Record<string, unknown>): Promise<{ success: boolean; eventId: string }> {

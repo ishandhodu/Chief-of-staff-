@@ -207,17 +207,28 @@ function getCalendarClient() {
   auth.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
   return google2.calendar({ version: "v3", auth });
 }
+function toEastern(date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const get = (type) => parseInt(parts.find((p) => p.type === type).value, 10);
+  return { year: get("year"), month: get("month") - 1, day: get("day") };
+}
 async function listTodayEvents(_args) {
   const calendar = getCalendarClient();
-  const now = /* @__PURE__ */ new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+  const { year, month, day } = toEastern(/* @__PURE__ */ new Date());
+  const startOfDay = new Date(Date.UTC(year, month, day, 4, 0, 0)).toISOString();
+  const endOfDay = new Date(Date.UTC(year, month, day + 1, 3, 59, 59)).toISOString();
   const res = await calendar.events.list({
     calendarId: "primary",
     timeMin: startOfDay,
     timeMax: endOfDay,
     singleEvents: true,
-    orderBy: "startTime"
+    orderBy: "startTime",
+    timeZone: "America/New_York"
   });
   return (res.data.items ?? []).map((item) => ({
     id: item.id ?? "",
@@ -252,6 +263,31 @@ async function detectConflicts(_args) {
     }
   }
   return { conflicts };
+}
+async function listEvents(args) {
+  const calendar = getCalendarClient();
+  const date = args.date;
+  if (!date || typeof date !== "string") {
+    throw new Error("listEvents requires a date in YYYY-MM-DD format");
+  }
+  const timeMin = `${date}T00:00:00-04:00`;
+  const timeMax = `${date}T23:59:59-04:00`;
+  const res = await calendar.events.list({
+    calendarId: "primary",
+    timeMin,
+    timeMax,
+    singleEvents: true,
+    orderBy: "startTime",
+    timeZone: "America/New_York"
+  });
+  return (res.data.items ?? []).map((item) => ({
+    id: item.id ?? "",
+    title: item.summary ?? "(no title)",
+    start: item.start?.dateTime ?? item.start?.date ?? "",
+    end: item.end?.dateTime ?? item.end?.date ?? "",
+    attendees: (item.attendees ?? []).map((a) => a.email ?? "").filter(Boolean),
+    description: item.description ?? ""
+  }));
 }
 async function updateEvent(args) {
   const eventId = args.eventId;
@@ -406,6 +442,7 @@ var LOW_RISK_TOOLS = /* @__PURE__ */ new Set([
   "save_draft",
   "label_email",
   "list_today_events",
+  "list_events",
   "detect_conflicts",
   "update_event",
   "delete_event",
@@ -490,6 +527,18 @@ var toolDefs = [
     description: "Get all calendar events scheduled for today.",
     input_schema: { type: "object", properties: {}, required: [] },
     execute: listTodayEvents
+  },
+  {
+    name: "list_events",
+    description: "Get all calendar events for a specific date (any date, not just today).",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "Date in YYYY-MM-DD format, e.g. 2026-04-14" }
+      },
+      required: ["date"]
+    },
+    execute: listEvents
   },
   {
     name: "detect_conflicts",

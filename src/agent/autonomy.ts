@@ -4,6 +4,7 @@ const LOW_RISK_TOOLS = new Set([
   'save_draft',
   'label_email',
   'list_today_events',
+  'list_events',
   'detect_conflicts',
   'update_event',
   'delete_event',
