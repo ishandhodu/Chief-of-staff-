@@ -1,6 +1,7 @@
 import type { Workflow, WorkflowContext } from '../types.js';
 import { ALL_TOOLS } from '../agent/tools.js';
 import { runAgentLoop } from '../agent/loop.js';
+import { buildMemoryContext } from '../agent/memory-context.js';
 
 const DIGEST_PROMPT = `
 You are an AI Chief of Staff preparing the CEO's morning briefing for today.
@@ -32,7 +33,11 @@ export const dailyDigestWorkflow: Workflow = {
   async run(ctx: WorkflowContext) {
     const channelId = process.env.DIGEST_CHANNEL_ID;
     if (!channelId) throw new Error('DIGEST_CHANNEL_ID environment variable is not set');
-    const result = await runAgentLoop(DIGEST_PROMPT, ALL_TOOLS, channelId);
+
+    const memoryContext = await buildMemoryContext();
+    const prompt = memoryContext ? `${memoryContext}\n\n${DIGEST_PROMPT}` : DIGEST_PROMPT;
+
+    const result = await runAgentLoop(prompt, ALL_TOOLS, channelId);
     await ctx.postToSlack(result.summary);
     // pendingApprovals not surfaced in digest: approval buttons are sent by inbox-triage at triage time
   },
