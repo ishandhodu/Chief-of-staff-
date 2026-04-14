@@ -25,11 +25,14 @@ Return ONLY a JSON object with these fields:
 - type: "Contact" or "Deadline"
 - subject: email address for contacts, topic keyword for deadlines
 - rule: the instruction (what to do when this comes up)
-- expires: ISO date string YYYY-MM-DD if a deadline date is mentioned, otherwise null
+- expires: ISO date string YYYY-MM-DD if a time window is mentioned (for contacts OR deadlines), otherwise null
 
 Examples:
 Input: "ishan@example.com is my lead investor, always urgent"
 Output: {"type":"Contact","subject":"ishan@example.com","rule":"lead investor, always treat as urgent","expires":null}
+
+Input: "ishan@anthropic.com is urgent for the next 3 months"
+Output: {"type":"Contact","subject":"ishan@anthropic.com","rule":"treat as urgent","expires":"${new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().split('T')[0]}"}
 
 Input: "home insurance renewal due May 15"
 Output: {"type":"Deadline","subject":"home insurance renewal","rule":"flag any related emails as urgent","expires":"2026-05-15"}`,
