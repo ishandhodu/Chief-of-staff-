@@ -1,7 +1,13 @@
 import { listMemories } from '../tools/notion.js';
 
 export async function buildMemoryContext(): Promise<string> {
-  const memories = await listMemories();
+  let memories;
+  try {
+    memories = await listMemories();
+  } catch {
+    return '';
+  }
+
   if (memories.length === 0) return '';
 
   const contacts = memories.filter((m) => m.type === 'Contact');

@@ -99,4 +99,16 @@ describe('learnMemoryWorkflow', () => {
       expect.stringContaining('/learn')
     );
   });
+
+  it('posts a fallback message when Claude returns no text block', async () => {
+    mockCreate.mockResolvedValue({ content: [] });
+
+    const ctx = makeCtx('some input that fails to parse');
+    await learnMemoryWorkflow.run(ctx);
+
+    expect(saveMemory).not.toHaveBeenCalled();
+    expect(ctx.postToSlack).toHaveBeenCalledWith(
+      expect.stringContaining('/learn')
+    );
+  });
 });

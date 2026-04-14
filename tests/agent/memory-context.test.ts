@@ -78,4 +78,10 @@ describe('buildMemoryContext', () => {
     expect(result).toContain('Contacts:');
     expect(result).toContain('Deadlines to watch for:');
   });
+
+  it('returns empty string when listMemories throws', async () => {
+    vi.mocked(listMemories).mockRejectedValue(new Error('NOTION_MEMORY_DATABASE_ID not set'));
+    const result = await buildMemoryContext();
+    expect(result).toBe('');
+  });
 });
