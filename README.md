@@ -175,13 +175,13 @@ Popular services like HubSpot, Linear, and Salesforce expose MCP (Model Context 
 
 ### Adding New Workflows
 
-A workflow is a prompt plus a set of tools. The behavior lives in the prompt — the agent figures out the execution. Adding one means:
+A workflow is a prompt plus a set of tools. The behavior lives in the prompt, the agent figures out the execution. Adding one means:
 
 1. Write a `src/workflows/my-workflow.ts` file with the prompt and a call to `runAgentLoop`
 2. Register it in `src/workflows/registry.ts`
 3. Add a slash command handler in `src/handlers/slack/commands.ts`
 
-Because workflows are just prompts with tools attached, new behaviors can be described in plain English and translated directly into a workflow file. This opens the door to a workflow builder where non-engineers describe what they want in a sentence — the system handles the translation using the same Claude API that powers the agent itself.
+Because workflows are just prompts with tools attached, new behaviors can be described in plain English and translated directly into a workflow file. This opens the door to a workflow builder where non-engineers describe what they want in a sentence, the system handles the translation using the same Claude API that powers the agent itself.
 
 ---
 
