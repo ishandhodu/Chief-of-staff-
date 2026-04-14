@@ -2,6 +2,7 @@ import type { Workflow, WorkflowContext } from '../types.js';
 import { ALL_TOOLS } from '../agent/tools.js';
 import { runAgentLoop } from '../agent/loop.js';
 import { postApprovalMessage } from '../slack/approval.js';
+import { buildMemoryContext } from '../agent/memory-context.js';
 
 const TRIAGE_PROMPT = `
 You are an AI Chief of Staff. Your task is to triage the CEO's inbox.
@@ -27,7 +28,11 @@ export const inboxTriageWorkflow: Workflow = {
   async run(ctx: WorkflowContext) {
     const channelId = process.env.DIGEST_CHANNEL_ID;
     if (!channelId) throw new Error('DIGEST_CHANNEL_ID environment variable is not set');
-    const result = await runAgentLoop(TRIAGE_PROMPT, ALL_TOOLS, channelId);
+
+    const memoryContext = await buildMemoryContext();
+    const prompt = memoryContext ? `${memoryContext}\n\n${TRIAGE_PROMPT}` : TRIAGE_PROMPT;
+
+    const result = await runAgentLoop(prompt, ALL_TOOLS, channelId);
 
     await ctx.postToSlack(`*Inbox Triage Complete*\n\n${result.summary}`);
 
