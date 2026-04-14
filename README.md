@@ -1,116 +1,143 @@
 # Chief of Staff
 
-An AI-powered executive assistant that manages your email, calendar, tasks, and communications through Slack. Built on Claude Sonnet 4.6 with an agentic tool-use loop, deployed as serverless functions on Vercel.
+An AI agent that manages your inbox, tasks, and calendar — entirely from Slack.
+
+---
+
+## Why I Built This
+
+Senior executives spend a disproportionate amount of their time on work that is important but not strategic: reading emails, deciding what to act on, creating tasks, rescheduling meetings. A human chief of staff handles this layer so the executive can focus on decisions only they can make.
+
+This project is that — but built as software. The agent reads your Gmail, makes judgment calls about what matters, drafts replies in the right context and tone, creates and tracks tasks in Notion, manages your calendar, and learns over time through plain-English instructions from Slack. It never sends an email without your approval.
+
+The core design principle: the agent should do the work, not summarize it for you to do.
+
+---
 
 ## What It Does
 
-Type a slash command in Slack and the agent handles the rest:
+### Slash Commands
 
-| Command | What happens |
+| Command | What it does |
 |---------|-------------|
-| `/triage` | Reads your 10 most recent unread emails, labels each one (urgent, needs-reply, FYI, newsletter, can-ignore), drafts replies for urgent items, and creates Notion tasks for anything actionable. |
-| `/task <query>` | Searches Gmail for a thread matching your query, extracts the action item, and creates a structured task in Notion with deadline, stakeholders, context, and priority. |
-| `/cal <instruction>` | Modifies your Google Calendar using natural language. Checks for conflicts before moving events and suggests free slots if there's a clash. |
-| `/todos` | Pulls all open tasks from your Notion database and posts them to Slack, grouped by status. |
+| `/triage` | Reads your 10 most recent unread emails, classifies each one, writes draft replies for anything urgent or needing a response, and creates Notion tasks |
+| `/task [query]` | Searches for a specific email thread and turns it into a structured Notion task with deadline, stakeholders, priority, and context |
+| `/cal [instruction]` | Manages your Google Calendar in plain English — move events, cancel them, reschedule them, with automatic conflict detection |
+| `/todos` | Lists all open tasks from your Notion database |
+| `/learn [instruction]` | Teaches the agent something new — a contact rule, a deadline, or a current priority — with optional expiry dates |
 
-Two cron jobs run automatically:
-- **Daily Digest** (7 AM ET) — morning briefing with top emails, today's calendar, and open tasks
-- **Inbox Triage** (every 2 hours) — labels and processes new unread emails
+### Automated Runs
 
-## Safety Layer
+| Trigger | What it does |
+|---------|-------------|
+| Every 2 hours | Runs inbox triage automatically |
+| Every day at 7am | Posts a daily digest summarizing the day ahead |
 
-The agent classifies every tool call as low-risk or high-risk before executing it.
+---
 
-- **Low-risk** (reading emails, checking calendar, creating drafts, labeling, creating tasks) — executes immediately, no approval needed.
-- **High-risk** (sending emails) — the agent pauses and posts an approval request to Slack with Approve/Cancel buttons. The action only executes if you click Approve. Pending approvals expire after 1 hour.
+## How It Works
 
-Only `send_email` is high-risk. Everything else runs autonomously.
+### The Agent Loop
 
-## Architecture
+Every command runs through the same core loop:
+
+1. A Slack slash command hits a Vercel serverless function
+2. The function returns a 200 immediately — Slack has a hard 3-second timeout, so the agent acknowledges instantly and does the real work async via `waitUntil()`
+3. The agent sends a prompt to Claude Sonnet 4.6 along with a set of available tools
+4. Claude responds with tool calls — read emails, create tasks, save drafts, move calendar events
+5. The loop executes each tool call, feeds the result back to Claude, and continues
+6. When Claude is done, the summary posts back to Slack
+
+The loop runs for a maximum of 10 iterations and handles tool errors gracefully without stopping.
+
+### Memory and Context
+
+The agent has a two-layer context system that shapes every workflow run.
+
+**Live memory** is stored in a Notion database. Every time a workflow runs, the agent fetches all active memory entries and prepends them to the prompt before calling Claude. Instructions you teach the agent via `/learn` immediately affect every future run — no redeployment, no config changes.
+
+Memory has two types:
+- **Contact** — a rule tied to a person or email address (e.g. "always treat as urgent", "no forward-looking statements")
+- **Deadline** — a time-sensitive topic to watch for across all emails (e.g. "board meeting tomorrow", "Series B closing May 1")
+
+Both types support an optional expiry date. Expired entries are filtered out automatically. The agent's context stays sharp because memory ages out on its own — you don't have to clean it up.
+
+**The prompt** is the second layer. Each workflow has a base prompt defining its standing behavior. The memory context is prepended to this prompt at runtime, so the agent always has both the fixed instructions and the current personal context. Changing the prompt changes the behavior permanently; changing memory changes it temporarily and contextually.
+
+### Trust and Autonomy
+
+Every tool is classified as either low-risk or high-risk before executing.
+
+**Low-risk tools** execute immediately with no approval:
+- Reading emails, drafts, and calendar events
+- Labeling emails
+- Saving Gmail drafts
+- Creating and updating Notion tasks
+- Moving and deleting calendar events
+- Posting Slack messages
+
+**High-risk tools** are queued for human approval before executing:
+- `send_email` — the agent composes the email, posts Approve/Cancel buttons in Slack, and waits. Nothing sends until you click Approve. Pending approvals expire after 1 hour.
+
+This boundary is intentional. Drafts let the agent do the work while keeping you in control of what actually goes out. The trust model can expand as confidence in the agent's judgment grows.
+
+### Workflow Architecture
+
+Each capability is a self-contained workflow — a named function that takes a context object and runs an agent loop with a specific prompt and tool set.
 
 ```
-Slack ──► /api/slack/commands ──► Workflow ──► Agent Loop ──► Tools
-                                                  │              │
-                                          Claude Sonnet 4.6    Gmail
-                                          (up to 10 turns)    Calendar
-                                                              Notion
-                                                              Slack
-
-Vercel Cron ──► /api/cron/digest ──► daily-digest workflow
-             ──► /api/cron/triage ──► inbox-triage workflow
-
-High-risk tool call:
-  Agent Loop ──► approval-store ──► Slack buttons ──► /api/slack/interactive ──► execute tool
+Slack command
+    ↓
+Handler (verify signature → return 200 → run async)
+    ↓
+Workflow (base prompt + memory context + tools)
+    ↓
+Agent loop (Claude Sonnet 4.6, up to 10 iterations)
+    ↓
+Tool calls execute (Gmail / Notion / Calendar / Slack)
+    ↓
+Summary posted to Slack
 ```
 
-**Request flow:**
-1. Slack sends a signed POST to `/api/slack/commands`
-2. Handler verifies the HMAC-SHA256 signature, responds 200 immediately ("Working on it...")
-3. `waitUntil` keeps the function alive while the workflow runs in the background
-4. Workflow calls `runAgentLoop()` with a prompt and the full tool set
-5. Claude iterates (up to 10 turns), calling tools and accumulating results
-6. Low-risk tools execute inline; high-risk tools go to the approval queue
-7. Final summary is posted back to the Slack channel
+Workflows are registered in a central registry. Adding a new workflow means writing a new file and adding one line to the registry — nothing else changes.
 
-## Project Structure
+---
 
-```
-src/
-├── agent/
-│   ├── loop.ts              # Core agentic loop — calls Claude, routes tool use, handles errors
-│   ├── tools.ts             # Tool registry — 14 tools with JSON schemas and risk levels
-│   ├── autonomy.ts          # Risk classification — low-risk whitelist, everything else is high
-│   └── approval-store.ts    # In-memory store for pending high-risk approvals (1hr TTL)
-├── tools/
-│   ├── gmail.ts             # Gmail API — list, search, draft, send, label
-│   ├── calendar.ts          # Calendar API — list today/any date, conflicts, update, delete
-│   ├── notion.ts            # Notion API — create task, search, update status, list tasks
-│   └── slack.ts             # Slack API — post message
-├── workflows/
-│   ├── registry.ts          # Workflow lookup by name
-│   ├── inbox-triage.ts      # Email triage with labeling and task creation
-│   ├── thread-to-task.ts    # Email thread → Notion task extraction
-│   ├── daily-digest.ts      # Morning briefing synthesis
-│   ├── calendar-manage.ts   # Natural language calendar management with conflict detection
-│   └── list-todos.ts        # Direct Notion query for open tasks
-├── handlers/
-│   ├── slack/
-│   │   ├── commands.ts      # Slash command router (/triage, /task, /cal, /todos)
-│   │   └── interactive.ts   # Approval button handler (Approve/Cancel)
-│   ├── cron/
-│   │   ├── digest.ts        # Daily digest cron endpoint
-│   │   └── triage.ts        # Inbox triage cron endpoint
-│   ├── debug.ts             # Health check
-│   └── process.ts           # Internal workflow processor
-├── slack/
-│   ├── verify.ts            # HMAC-SHA256 signature verification
-│   ├── approval.ts          # Approval message block formatting
-│   └── raw-body.ts          # Raw request body parser for signature verification
-└── types.ts                 # Core interfaces (Tool, Workflow, WorkflowContext, ApprovalRequest)
+## Tech Stack
 
-api/                         # Compiled Vercel functions (generated by tsup, committed to repo)
-scripts/
-└── get-google-token.ts      # Helper to generate Google OAuth refresh token
-tests/                       # Vitest test suites
-```
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Vercel Serverless Functions (Node.js) |
+| AI model | Claude Sonnet 4.6 via Anthropic SDK |
+| Email | Gmail API (Google OAuth) |
+| Tasks | Notion API |
+| Calendar | Google Calendar API |
+| Slack | Slack Web API + slash commands |
+| Approval state | Vercel KV (Redis) — 1-hour TTL |
+| Scheduling | Vercel Cron |
+| Language | TypeScript (ESM) |
+| Build | tsup |
+| Tests | Vitest |
+
+---
 
 ## Tools
 
-The agent has access to 14 tools across 4 integrations:
+The agent has access to 14 tools across 4 integrations. Each tool has a name, a description, a JSON input schema, an execute function, and a risk classification.
 
 ### Gmail
 | Tool | Risk | Description |
 |------|------|-------------|
 | `list_emails` | Low | Fetch most recent unread emails |
 | `search_thread` | Low | Search for a thread by query |
-| `save_draft` | Low | Save an email reply as a draft |
-| `send_email` | **High** | Send an email (requires CEO approval) |
+| `save_draft` | Low | Save an email reply as a Gmail draft |
+| `send_email` | **High** | Send an email — requires approval |
 | `label_email` | Low | Apply a label (urgent, needs-reply, FYI, newsletter, can-ignore) |
 
 ### Google Calendar
 | Tool | Risk | Description |
 |------|------|-------------|
-| `list_today_events` | Low | Get today's calendar (Eastern Time) |
+| `list_today_events` | Low | Get today's calendar events |
 | `list_events` | Low | Get events for any specific date |
 | `detect_conflicts` | Low | Find overlapping events |
 | `update_event` | Low | Change event time, title, or description |
@@ -119,108 +146,138 @@ The agent has access to 14 tools across 4 integrations:
 ### Notion
 | Tool | Risk | Description |
 |------|------|-------------|
-| `create_task` | Low | Create a task with title, deadline, stakeholders, priority |
+| `create_task` | Low | Create a task with title, deadline, stakeholders, priority, and source |
 | `search_pages` | Low | Search tasks by title keyword |
-| `update_page` | Low | Update task status (To Do, In Progress, Done) |
+| `update_page` | Low | Update a task's status |
 
 ### Slack
 | Tool | Risk | Description |
 |------|------|-------------|
 | `post_message` | Low | Post a message to a channel |
 
-## Tech Stack
+---
 
-- **Runtime**: Node.js (ESM)
-- **AI**: Claude Sonnet 4.6 via Anthropic SDK
-- **Deployment**: Vercel Functions with Fluid Compute
-- **Build**: tsup (esbuild-based bundler)
-- **Language**: TypeScript 5.5
-- **Testing**: Vitest
-- **APIs**: Gmail, Google Calendar, Notion, Slack
+## Extensibility
+
+The system is designed to grow in two directions: new tools and new workflows.
+
+### Adding New Tools
+
+A tool is a TypeScript object with a name, a description, a JSON schema for its inputs, an execute function, and a risk level. Adding one means:
+
+1. Implement the API client function in `src/tools/`
+2. Add the tool definition to `src/agent/tools.ts`
+3. Classify it in `src/agent/autonomy.ts`
+
+Any workflow that uses `ALL_TOOLS` immediately has access to the new tool on the next deploy.
+
+Popular services like HubSpot, Linear, and Salesforce expose MCP (Model Context Protocol) servers. The tool layer can proxy MCP calls, which means new integrations can be onboarded without writing API client code from scratch — you point the agent at the MCP server and the tools become available automatically.
+
+### Adding New Workflows
+
+A workflow is a prompt plus a set of tools. The behavior lives in the prompt — the agent figures out the execution. Adding one means:
+
+1. Write a `src/workflows/my-workflow.ts` file with the prompt and a call to `runAgentLoop`
+2. Register it in `src/workflows/registry.ts`
+3. Add a slash command handler in `src/handlers/slack/commands.ts`
+
+Because workflows are just prompts with tools attached, new behaviors can be described in plain English and translated directly into a workflow file. This opens the door to a workflow builder where non-engineers describe what they want in a sentence — the system handles the translation using the same Claude API that powers the agent itself.
+
+---
+
+## Project Structure
+
+```
+src/
+├── agent/
+│   ├── loop.ts            # Core agent loop — calls Claude, executes tools, handles approvals
+│   ├── tools.ts           # All 14 tool definitions with JSON schemas
+│   ├── autonomy.ts        # Risk classification (low vs high)
+│   ├── memory-context.ts  # Fetches memory from Notion, builds context string
+│   └── approval-store.ts  # Persists pending approvals to Vercel KV (1-hour TTL)
+├── workflows/
+│   ├── inbox-triage.ts    # /triage — classify, draft, task
+│   ├── thread-to-task.ts  # /task — email thread to Notion task
+│   ├── calendar-manage.ts # /cal — natural language calendar management
+│   ├── list-todos.ts      # /todos — open tasks from Notion
+│   ├── learn-memory.ts    # /learn — extract and save structured memory
+│   ├── daily-digest.ts    # Morning briefing cron
+│   └── registry.ts        # Workflow registry
+├── tools/
+│   ├── gmail.ts           # Gmail API client
+│   ├── notion.ts          # Notion API client (tasks + memory)
+│   ├── calendar.ts        # Google Calendar API client
+│   └── slack.ts           # Slack API client
+├── handlers/
+│   ├── slack/
+│   │   ├── commands.ts    # Slash command router
+│   │   └── interactive.ts # Approval button handler
+│   └── cron/
+│       ├── triage.ts      # Scheduled triage endpoint
+│       └── digest.ts      # Scheduled digest endpoint
+├── slack/
+│   ├── verify.ts          # HMAC-SHA256 signature verification
+│   ├── approval.ts        # Posts approval buttons to Slack
+│   └── raw-body.ts        # Raw body parsing for signature verification
+└── types.ts               # Shared TypeScript interfaces
+```
+
+---
+
+## Notion Database Schemas
+
+### Tasks Database
+
+| Property | Type | Values |
+|----------|------|--------|
+| Name | Title | Task description |
+| Status | Select | To Do, In Progress, Done |
+| Priority | Select | High, Medium, Low |
+| Deadline | Date | YYYY-MM-DD |
+| Stakeholders | Rich text | Comma-separated names or emails |
+| Context | Rich text | 1-2 sentence summary |
+| Source | Rich text | Gmail message ID |
+
+### Memory Database
+
+| Property | Type | Values |
+|----------|------|--------|
+| Name | Title | Email address (Contact) or topic keyword (Deadline) |
+| Type | Select | Contact, Deadline |
+| Rule | Rich text | The instruction — what to do when this comes up |
+| Expires | Date | YYYY-MM-DD — entry is ignored after this date |
+| Raw | Rich text | Original plain-English input from the user |
+
+---
+
+## Environment Variables
+
+```bash
+ANTHROPIC_API_KEY=
+SLACK_BOT_TOKEN=
+SLACK_SIGNING_SECRET=
+NOTION_API_KEY=
+NOTION_DATABASE_ID=           # Tasks database
+NOTION_MEMORY_DATABASE_ID=    # Memory database
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REFRESH_TOKEN=
+DIGEST_CHANNEL_ID=            # Slack channel for agent output
+KV_REST_API_URL=              # Vercel KV
+KV_REST_API_TOKEN=
+CRON_SECRET=                  # Vercel cron authorization
+```
+
+---
 
 ## Setup
 
-### Prerequisites
-
-- Node.js 20+
-- A Vercel account
-- API keys for: Anthropic, Slack, Google (OAuth), Notion
-
-### 1. Clone and install
-
 ```bash
-git clone https://github.com/ishandhodu/Chief-of-staff-.git
-cd Chief-of-staff-
 npm install
-```
-
-### 2. Configure environment variables
-
-Copy `.env.example` to `.env.local` and fill in the values:
-
-```
-ANTHROPIC_API_KEY=         # Claude API key
-SLACK_BOT_TOKEN=           # Slack bot token (xoxb-...)
-SLACK_SIGNING_SECRET=      # Slack app signing secret
-NOTION_API_KEY=            # Notion integration token
-NOTION_DATABASE_ID=        # Notion database ID for tasks
-GOOGLE_CLIENT_ID=          # Google OAuth client ID
-GOOGLE_CLIENT_SECRET=      # Google OAuth client secret
-GOOGLE_REFRESH_TOKEN=      # Google OAuth refresh token (see below)
-DIGEST_CHANNEL_ID=         # Slack channel ID for posting results
-CRON_SECRET=               # Bearer token to protect cron endpoints
-```
-
-### 3. Generate Google OAuth refresh token
-
-```bash
-npm run get-google-token
-```
-
-This opens a browser flow to authorize Gmail and Calendar access. Make sure to request the full `calendar` scope (not `calendar.readonly`) if you want the agent to modify events.
-
-### 4. Set up Notion
-
-1. Create a Notion integration at [notion.so/my-integrations](https://www.notion.so/my-integrations)
-2. Create a database with a **Name** (title) column and a **Status** (select) column with options: `To Do`, `In Progress`, `Done`
-3. Connect the integration to your database (Share → Invite → select your integration)
-4. Copy the database ID from the URL
-
-### 5. Set up Slack app
-
-1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps)
-2. Add slash commands pointing to your Vercel deployment URL:
-   - `/triage` → `https://your-app.vercel.app/api/slack/commands`
-   - `/task` → `https://your-app.vercel.app/api/slack/commands`
-   - `/cal` → `https://your-app.vercel.app/api/slack/commands`
-   - `/todos` → `https://your-app.vercel.app/api/slack/commands`
-3. Set the Interactivity Request URL to `https://your-app.vercel.app/api/slack/interactive`
-4. Install the app to your workspace
-
-### 6. Deploy
-
-```bash
+npm run get-google-token   # Generate Google OAuth refresh token
 npm run build
-vercel --prod
+vercel dev                 # Local development
+vercel --prod              # Deploy
 ```
 
-Set all environment variables in the Vercel dashboard under Settings → Environment Variables.
-
-### 7. Verify
-
-Run `/triage` in your Slack channel. You should see "Working on it..." followed by a triage summary.
-
-## Development
-
-```bash
-npm run dev       # Start Vercel dev server
-npm run build     # Build with tsup
-npm test          # Run tests
-npm run test:watch # Watch mode
-```
-
-The build compiles 6 entry points from `src/handlers/` into `api/` as bundled ESM files. These are committed to the repo so Vercel can deploy them directly.
-
-## License
-
-Private project.
+Add all environment variables in the Vercel dashboard under Settings → Environment Variables. Point all Slack slash commands to `https://your-app.vercel.app/api/slack/commands` and set the Interactivity Request URL to `https://your-app.vercel.app/api/slack/interactive`.
