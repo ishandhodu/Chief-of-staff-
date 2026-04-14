@@ -8,7 +8,7 @@ An AI agent that manages your inbox, tasks, and calendar — entirely from Slack
 
 Senior executives spend a disproportionate amount of their time on work that is important but not strategic: reading emails, deciding what to act on, creating tasks, rescheduling meetings. A human chief of staff handles this layer so the executive can focus on decisions only they can make.
 
-This project is that — but built as software. The agent reads your Gmail, makes judgment calls about what matters, drafts replies in the right context and tone, creates and tracks tasks in Notion, manages your calendar, and learns over time through plain-English instructions from Slack. It never sends an email without your approval.
+This project is that, but built as software. The agent reads your Gmail, makes judgment calls about what matters, drafts replies in the right context and tone, creates and tracks tasks in Notion, manages your calendar, and learns over time through plain-English instructions from Slack. It never sends an email without your approval.
 
 The core design principle: the agent should do the work, not summarize it for you to do.
 
@@ -185,99 +185,7 @@ Because workflows are just prompts with tools attached, new behaviors can be des
 
 ---
 
-## Project Structure
 
-```
-src/
-├── agent/
-│   ├── loop.ts            # Core agent loop — calls Claude, executes tools, handles approvals
-│   ├── tools.ts           # All 14 tool definitions with JSON schemas
-│   ├── autonomy.ts        # Risk classification (low vs high)
-│   ├── memory-context.ts  # Fetches memory from Notion, builds context string
-│   └── approval-store.ts  # Persists pending approvals to Vercel KV (1-hour TTL)
-├── workflows/
-│   ├── inbox-triage.ts    # /triage — classify, draft, task
-│   ├── thread-to-task.ts  # /task — email thread to Notion task
-│   ├── calendar-manage.ts # /cal — natural language calendar management
-│   ├── list-todos.ts      # /todos — open tasks from Notion
-│   ├── learn-memory.ts    # /learn — extract and save structured memory
-│   ├── daily-digest.ts    # Morning briefing cron
-│   └── registry.ts        # Workflow registry
-├── tools/
-│   ├── gmail.ts           # Gmail API client
-│   ├── notion.ts          # Notion API client (tasks + memory)
-│   ├── calendar.ts        # Google Calendar API client
-│   └── slack.ts           # Slack API client
-├── handlers/
-│   ├── slack/
-│   │   ├── commands.ts    # Slash command router
-│   │   └── interactive.ts # Approval button handler
-│   └── cron/
-│       ├── triage.ts      # Scheduled triage endpoint
-│       └── digest.ts      # Scheduled digest endpoint
-├── slack/
-│   ├── verify.ts          # HMAC-SHA256 signature verification
-│   ├── approval.ts        # Posts approval buttons to Slack
-│   └── raw-body.ts        # Raw body parsing for signature verification
-└── types.ts               # Shared TypeScript interfaces
-```
 
----
 
-## Notion Database Schemas
 
-### Tasks Database
-
-| Property | Type | Values |
-|----------|------|--------|
-| Name | Title | Task description |
-| Status | Select | To Do, In Progress, Done |
-| Priority | Select | High, Medium, Low |
-| Deadline | Date | YYYY-MM-DD |
-| Stakeholders | Rich text | Comma-separated names or emails |
-| Context | Rich text | 1-2 sentence summary |
-| Source | Rich text | Gmail message ID |
-
-### Memory Database
-
-| Property | Type | Values |
-|----------|------|--------|
-| Name | Title | Email address (Contact) or topic keyword (Deadline) |
-| Type | Select | Contact, Deadline |
-| Rule | Rich text | The instruction — what to do when this comes up |
-| Expires | Date | YYYY-MM-DD — entry is ignored after this date |
-| Raw | Rich text | Original plain-English input from the user |
-
----
-
-## Environment Variables
-
-```bash
-ANTHROPIC_API_KEY=
-SLACK_BOT_TOKEN=
-SLACK_SIGNING_SECRET=
-NOTION_API_KEY=
-NOTION_DATABASE_ID=           # Tasks database
-NOTION_MEMORY_DATABASE_ID=    # Memory database
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REFRESH_TOKEN=
-DIGEST_CHANNEL_ID=            # Slack channel for agent output
-KV_REST_API_URL=              # Vercel KV
-KV_REST_API_TOKEN=
-CRON_SECRET=                  # Vercel cron authorization
-```
-
----
-
-## Setup
-
-```bash
-npm install
-npm run get-google-token   # Generate Google OAuth refresh token
-npm run build
-vercel dev                 # Local development
-vercel --prod              # Deploy
-```
-
-Add all environment variables in the Vercel dashboard under Settings → Environment Variables. Point all Slack slash commands to `https://your-app.vercel.app/api/slack/commands` and set the Interactivity Request URL to `https://your-app.vercel.app/api/slack/interactive`.
