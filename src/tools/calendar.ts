@@ -76,3 +76,52 @@ export async function detectConflicts(_args: Record<string, unknown>): Promise<C
 
   return { conflicts };
 }
+
+export async function updateEvent(args: Record<string, unknown>): Promise<{ success: boolean; eventId: string }> {
+  const eventId = args.eventId as string | undefined;
+  if (!eventId || typeof eventId !== 'string') {
+    throw new Error('updateEvent requires a non-empty eventId string');
+  }
+
+  const calendar = getCalendarClient();
+
+  // Fetch the existing event first so we can merge changes
+  const existing = await calendar.events.get({ calendarId: 'primary', eventId });
+
+  const updates: Record<string, unknown> = {};
+
+  const summary = args.summary as string | undefined;
+  if (summary) updates.summary = summary;
+
+  const startTime = args.startTime as string | undefined;
+  const endTime = args.endTime as string | undefined;
+  if (startTime) {
+    updates.start = { dateTime: startTime, timeZone: existing.data.start?.timeZone ?? 'America/New_York' };
+  }
+  if (endTime) {
+    updates.end = { dateTime: endTime, timeZone: existing.data.end?.timeZone ?? 'America/New_York' };
+  }
+
+  const description = args.description as string | undefined;
+  if (description) updates.description = description;
+
+  await calendar.events.patch({
+    calendarId: 'primary',
+    eventId,
+    requestBody: updates,
+  });
+
+  return { success: true, eventId };
+}
+
+export async function deleteEvent(args: Record<string, unknown>): Promise<{ success: boolean; eventId: string }> {
+  const eventId = args.eventId as string | undefined;
+  if (!eventId || typeof eventId !== 'string') {
+    throw new Error('deleteEvent requires a non-empty eventId string');
+  }
+
+  const calendar = getCalendarClient();
+  await calendar.events.delete({ calendarId: 'primary', eventId });
+
+  return { success: true, eventId };
+}

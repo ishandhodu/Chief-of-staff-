@@ -1,6 +1,6 @@
 import type { Tool } from '../types.js';
 import { listEmails, searchThread, saveDraft, sendEmail, labelEmail } from '../tools/gmail.js';
-import { listTodayEvents, detectConflicts } from '../tools/calendar.js';
+import { listTodayEvents, detectConflicts, updateEvent, deleteEvent } from '../tools/calendar.js';
 import { createTask, searchPages, updatePage } from '../tools/notion.js';
 import { postMessage } from '../tools/slack.js';
 import { getRiskLevel } from './autonomy.js';
@@ -82,6 +82,34 @@ const toolDefs: Omit<Tool, 'riskLevel'>[] = [
     description: 'Identify overlapping calendar events today.',
     input_schema: { type: 'object', properties: {}, required: [] },
     execute: detectConflicts,
+  },
+  {
+    name: 'update_event',
+    description: 'Update a Google Calendar event (change time, title, or description).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        eventId: { type: 'string', description: 'Google Calendar event ID' },
+        summary: { type: 'string', description: 'New event title (optional)' },
+        startTime: { type: 'string', description: 'New start time in ISO 8601 format, e.g. 2026-04-14T10:00:00-04:00 (optional)' },
+        endTime: { type: 'string', description: 'New end time in ISO 8601 format, e.g. 2026-04-14T11:00:00-04:00 (optional)' },
+        description: { type: 'string', description: 'New event description (optional)' },
+      },
+      required: ['eventId'],
+    },
+    execute: updateEvent,
+  },
+  {
+    name: 'delete_event',
+    description: 'Delete/cancel a Google Calendar event.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        eventId: { type: 'string', description: 'Google Calendar event ID' },
+      },
+      required: ['eventId'],
+    },
+    execute: deleteEvent,
   },
   {
     name: 'create_task',

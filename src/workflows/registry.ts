@@ -2,11 +2,13 @@ import type { Workflow } from '../types.js';
 import { inboxTriageWorkflow } from './inbox-triage.js';
 import { threadToTaskWorkflow } from './thread-to-task.js';
 import { dailyDigestWorkflow } from './daily-digest.js';
+import { calendarManageWorkflow } from './calendar-manage.js';
 
 const workflows: Map<string, Workflow> = new Map([
   ['inbox-triage', inboxTriageWorkflow],
   ['thread-to-task', threadToTaskWorkflow],
   ['daily-digest', dailyDigestWorkflow],
+  ['calendar-manage', calendarManageWorkflow],
 ]);
 
 export function getWorkflow(name: string): Workflow | undefined {

@@ -63,6 +63,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           } else {
             await workflow.run({ slackUserId: user_id, input: text, postToSlack });
           }
+        } else if (command === '/calendar') {
+          const workflow = getWorkflow('calendar-manage');
+          if (!workflow) {
+            await postToSlack('Workflow not found: calendar-manage');
+          } else {
+            await workflow.run({ slackUserId: user_id, input: text, postToSlack });
+          }
         } else {
           await postToSlack(`Unknown command: ${command}`);
         }

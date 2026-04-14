@@ -214,6 +214,42 @@ async function detectConflicts(_args) {
   }
   return { conflicts };
 }
+async function updateEvent(args) {
+  const eventId = args.eventId;
+  if (!eventId || typeof eventId !== "string") {
+    throw new Error("updateEvent requires a non-empty eventId string");
+  }
+  const calendar = getCalendarClient();
+  const existing = await calendar.events.get({ calendarId: "primary", eventId });
+  const updates = {};
+  const summary = args.summary;
+  if (summary) updates.summary = summary;
+  const startTime = args.startTime;
+  const endTime = args.endTime;
+  if (startTime) {
+    updates.start = { dateTime: startTime, timeZone: existing.data.start?.timeZone ?? "America/New_York" };
+  }
+  if (endTime) {
+    updates.end = { dateTime: endTime, timeZone: existing.data.end?.timeZone ?? "America/New_York" };
+  }
+  const description = args.description;
+  if (description) updates.description = description;
+  await calendar.events.patch({
+    calendarId: "primary",
+    eventId,
+    requestBody: updates
+  });
+  return { success: true, eventId };
+}
+async function deleteEvent(args) {
+  const eventId = args.eventId;
+  if (!eventId || typeof eventId !== "string") {
+    throw new Error("deleteEvent requires a non-empty eventId string");
+  }
+  const calendar = getCalendarClient();
+  await calendar.events.delete({ calendarId: "primary", eventId });
+  return { success: true, eventId };
+}
 
 // src/tools/notion.ts
 import { Client } from "@notionhq/client";
@@ -332,6 +368,8 @@ var LOW_RISK_TOOLS = /* @__PURE__ */ new Set([
   "label_email",
   "list_today_events",
   "detect_conflicts",
+  "update_event",
+  "delete_event",
   "create_task",
   "search_pages",
   "update_page",
@@ -419,6 +457,34 @@ var toolDefs = [
     description: "Identify overlapping calendar events today.",
     input_schema: { type: "object", properties: {}, required: [] },
     execute: detectConflicts
+  },
+  {
+    name: "update_event",
+    description: "Update a Google Calendar event (change time, title, or description).",
+    input_schema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string", description: "Google Calendar event ID" },
+        summary: { type: "string", description: "New event title (optional)" },
+        startTime: { type: "string", description: "New start time in ISO 8601 format, e.g. 2026-04-14T10:00:00-04:00 (optional)" },
+        endTime: { type: "string", description: "New end time in ISO 8601 format, e.g. 2026-04-14T11:00:00-04:00 (optional)" },
+        description: { type: "string", description: "New event description (optional)" }
+      },
+      required: ["eventId"]
+    },
+    execute: updateEvent
+  },
+  {
+    name: "delete_event",
+    description: "Delete/cancel a Google Calendar event.",
+    input_schema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string", description: "Google Calendar event ID" }
+      },
+      required: ["eventId"]
+    },
+    execute: deleteEvent
   },
   {
     name: "create_task",
@@ -731,11 +797,45 @@ var dailyDigestWorkflow = {
   }
 };
 
+// src/workflows/calendar-manage.ts
+var calendarManageWorkflow = {
+  name: "calendar-manage",
+  async run(ctx) {
+    if (!ctx.input) {
+      await ctx.postToSlack(
+        "Please provide instructions. Usage: `/calendar [what you want to change]`\nExamples:\n- `/calendar move my standup to 3pm`\n- `/calendar cancel the investor call`\n- `/calendar reschedule team sync to tomorrow at 10am`"
+      );
+      return;
+    }
+    const channelId = process.env.DIGEST_CHANNEL_ID;
+    if (!channelId) throw new Error("DIGEST_CHANNEL_ID environment variable is not set");
+    const prompt = `
+You are an AI Chief of Staff. The CEO wants to modify their calendar.
+
+Instruction: "${ctx.input}"
+
+Steps:
+1. Call list_today_events to see today's calendar.
+2. Identify the event that matches the CEO's instruction. Match by title keywords \u2014 be flexible.
+3. Execute the change:
+   - To reschedule/move: call update_event with the new startTime and endTime (keep the same duration unless told otherwise). Use ISO 8601 format with timezone offset.
+   - To cancel/remove: call delete_event.
+   - To rename: call update_event with the new summary.
+4. Report what you did: the event name, what changed, and the new time if applicable.
+
+If no matching event is found, report that clearly. If the instruction is ambiguous, pick the most likely match and explain your choice.
+    `.trim();
+    const result = await runAgentLoop(prompt, ALL_TOOLS, channelId);
+    await ctx.postToSlack(result.summary);
+  }
+};
+
 // src/workflows/registry.ts
 var workflows = /* @__PURE__ */ new Map([
   ["inbox-triage", inboxTriageWorkflow],
   ["thread-to-task", threadToTaskWorkflow],
-  ["daily-digest", dailyDigestWorkflow]
+  ["daily-digest", dailyDigestWorkflow],
+  ["calendar-manage", calendarManageWorkflow]
 ]);
 function getWorkflow(name) {
   return workflows.get(name);

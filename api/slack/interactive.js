@@ -253,6 +253,42 @@ async function detectConflicts(_args) {
   }
   return { conflicts };
 }
+async function updateEvent(args) {
+  const eventId = args.eventId;
+  if (!eventId || typeof eventId !== "string") {
+    throw new Error("updateEvent requires a non-empty eventId string");
+  }
+  const calendar = getCalendarClient();
+  const existing = await calendar.events.get({ calendarId: "primary", eventId });
+  const updates = {};
+  const summary = args.summary;
+  if (summary) updates.summary = summary;
+  const startTime = args.startTime;
+  const endTime = args.endTime;
+  if (startTime) {
+    updates.start = { dateTime: startTime, timeZone: existing.data.start?.timeZone ?? "America/New_York" };
+  }
+  if (endTime) {
+    updates.end = { dateTime: endTime, timeZone: existing.data.end?.timeZone ?? "America/New_York" };
+  }
+  const description = args.description;
+  if (description) updates.description = description;
+  await calendar.events.patch({
+    calendarId: "primary",
+    eventId,
+    requestBody: updates
+  });
+  return { success: true, eventId };
+}
+async function deleteEvent(args) {
+  const eventId = args.eventId;
+  if (!eventId || typeof eventId !== "string") {
+    throw new Error("deleteEvent requires a non-empty eventId string");
+  }
+  const calendar = getCalendarClient();
+  await calendar.events.delete({ calendarId: "primary", eventId });
+  return { success: true, eventId };
+}
 
 // src/tools/notion.ts
 import { Client } from "@notionhq/client";
@@ -371,6 +407,8 @@ var LOW_RISK_TOOLS = /* @__PURE__ */ new Set([
   "label_email",
   "list_today_events",
   "detect_conflicts",
+  "update_event",
+  "delete_event",
   "create_task",
   "search_pages",
   "update_page",
@@ -458,6 +496,34 @@ var toolDefs = [
     description: "Identify overlapping calendar events today.",
     input_schema: { type: "object", properties: {}, required: [] },
     execute: detectConflicts
+  },
+  {
+    name: "update_event",
+    description: "Update a Google Calendar event (change time, title, or description).",
+    input_schema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string", description: "Google Calendar event ID" },
+        summary: { type: "string", description: "New event title (optional)" },
+        startTime: { type: "string", description: "New start time in ISO 8601 format, e.g. 2026-04-14T10:00:00-04:00 (optional)" },
+        endTime: { type: "string", description: "New end time in ISO 8601 format, e.g. 2026-04-14T11:00:00-04:00 (optional)" },
+        description: { type: "string", description: "New event description (optional)" }
+      },
+      required: ["eventId"]
+    },
+    execute: updateEvent
+  },
+  {
+    name: "delete_event",
+    description: "Delete/cancel a Google Calendar event.",
+    input_schema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string", description: "Google Calendar event ID" }
+      },
+      required: ["eventId"]
+    },
+    execute: deleteEvent
   },
   {
     name: "create_task",
