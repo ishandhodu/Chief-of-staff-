@@ -899,11 +899,18 @@ Steps:
 1. Call list_today_events to see today's calendar. If the instruction mentions a specific date other than today, call list_events with that date (YYYY-MM-DD format) instead.
 2. If list_today_events returns no events (or the event isn't found), try list_events with today's date "${todayET}" as a fallback \u2014 timezone differences can cause list_today_events to miss events.
 3. Identify the event that matches the CEO's instruction. Match by title keywords \u2014 be flexible.
-4. Execute the change:
+4. **Conflict check** (for reschedule/move operations):
+   - Before moving an event, call list_events for the TARGET date to see what's already scheduled.
+   - Check if the new time slot overlaps with any existing event on that day.
+   - If there IS a conflict, DO NOT move the event. Instead report:
+     - The event you were going to move
+     - The conflicting event (name, time)
+     - Suggest alternative times that are free on that day
+5. Execute the change (only if no conflicts):
    - To reschedule/move: call update_event with the new startTime and endTime (keep the same duration unless told otherwise). Use ISO 8601 format with Eastern timezone offset (-04:00 for EDT, -05:00 for EST).
    - To cancel/remove: call delete_event.
    - To rename: call update_event with the new summary.
-5. Report what you did: the event name, what changed, and the new time if applicable.
+6. Report what you did: the event name, what changed, and the new time if applicable.
 
 If no matching event is found, report that clearly. If the instruction is ambiguous, pick the most likely match and explain your choice.
     `.trim();
