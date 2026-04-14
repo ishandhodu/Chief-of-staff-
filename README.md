@@ -60,7 +60,7 @@ Memory has two types:
 - **Contact** — a rule tied to a person or email address (e.g. "always treat as urgent", "no forward-looking statements")
 - **Deadline** — a time-sensitive topic to watch for across all emails (e.g. "board meeting tomorrow", "Series B closing May 1")
 
-Both types support an optional expiry date. Expired entries are filtered out automatically. The agent's context stays sharp because memory ages out on its own — you don't have to clean it up.
+Both types support an optional expiry date. Expired entries are filtered out automatically. The agent's context stays sharp because memory ages out on its own, you don't have to clean it up.
 
 **The prompt** is the second layer. Each workflow has a base prompt defining its standing behavior. The memory context is prepended to this prompt at runtime, so the agent always has both the fixed instructions and the current personal context. Changing the prompt changes the behavior permanently; changing memory changes it temporarily and contextually.
 
