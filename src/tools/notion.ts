@@ -159,3 +159,80 @@ export async function updatePage(args: Record<string, unknown>): Promise<{ succe
 
   return { success: true, pageId };
 }
+
+export interface MemoryEntry {
+  pageId: string;
+  subject: string;
+  type: 'Contact' | 'Deadline';
+  rule: string;
+  expires: string | null;
+  raw: string;
+}
+
+export async function saveMemory(args: {
+  subject: string;
+  type: 'Contact' | 'Deadline';
+  rule: string;
+  expires?: string | null;
+  raw: string;
+}): Promise<{ pageId: string }> {
+  const notion = getNotionClient();
+  const databaseId = process.env.NOTION_MEMORY_DATABASE_ID;
+  if (!databaseId) throw new Error('NOTION_MEMORY_DATABASE_ID environment variable is not set');
+
+  const properties: Record<string, unknown> = {
+    Name: { title: [{ text: { content: args.subject } }] },
+    Type: { select: { name: args.type } },
+    Rule: { rich_text: [{ text: { content: args.rule } }] },
+    Raw: { rich_text: [{ text: { content: args.raw } }] },
+  };
+
+  if (args.expires) {
+    properties['Expires'] = { date: { start: args.expires } };
+  }
+
+  const res = await notion.pages.create({
+    parent: { database_id: databaseId },
+    properties: properties as never,
+  });
+
+  const page = res as { id: string };
+  if (!page.id) throw new Error('Notion API returned page without id');
+  return { pageId: page.id };
+}
+
+export async function listMemories(): Promise<MemoryEntry[]> {
+  const notion = getNotionClient();
+  const databaseId = process.env.NOTION_MEMORY_DATABASE_ID;
+  if (!databaseId) throw new Error('NOTION_MEMORY_DATABASE_ID environment variable is not set');
+
+  const res = await notion.databases.query({
+    database_id: databaseId,
+    page_size: 100,
+  });
+
+  const today = new Date().toISOString().split('T')[0];
+
+  return res.results
+    .map((page: unknown) => {
+      const p = page as {
+        id: string;
+        properties: {
+          Name: { title: Array<{ plain_text: string }> };
+          Type: { select: { name: string } | null };
+          Rule: { rich_text: Array<{ plain_text: string }> };
+          Expires: { date: { start: string } | null };
+          Raw: { rich_text: Array<{ plain_text: string }> };
+        };
+      };
+      return {
+        pageId: p.id,
+        subject: p.properties.Name.title[0]?.plain_text ?? '',
+        type: (p.properties.Type.select?.name ?? 'Contact') as 'Contact' | 'Deadline',
+        rule: p.properties.Rule.rich_text[0]?.plain_text ?? '',
+        expires: p.properties.Expires.date?.start ?? null,
+        raw: p.properties.Raw.rich_text[0]?.plain_text ?? '',
+      };
+    })
+    .filter((entry) => !entry.expires || entry.expires >= today);
+}
